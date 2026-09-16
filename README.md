@@ -1,359 +1,161 @@
-# Strumly UI
+# 🎸 Strumly
 
-I want you to build ONLY the frontend UI for a web application called "Strumly".
+### Play More. Feel More. 🎶
 
-IMPORTANT:
+> **Every song is closer than you think.**
 
-- This is FRONTEND ONLY.
+Strumly is a modern, premium music platform designed for guitarists and music lovers to discover **guitar chords, lyrics, song arrangements, and music-related content** in one beautiful experience.
 
-- Do NOT create a backend.
+Built with a focus on simplicity, discoverability, and a warm cinematic interface, Strumly aims to make finding and playing songs feel as enjoyable as listening to them.
 
-- Do NOT create a database.
+---
 
-- Do NOT use Supabase.
+## ✨ Features
 
-- Do NOT implement authentication/backend logic.
+### 🔎 Discover Songs
 
-- My backend already exists and will be connected later through REST APIs.
+Search for songs, artists, genres, and music-related content through a clean and intuitive search experience.
 
-- For now use realistic mock data and clean service/API abstraction layers so the backend can be connected later.
+### 🎸 Guitar Chords & Lyrics
 
-I have attached a screenshot that represents the visual direction I want.
+Explore songs with guitar chords and lyrics arranged for an easy playing experience.
 
-Recreate the visual language and overall layout of the screenshot, but make the implementation a polished, modern, production-quality responsive web interface rather than a literal pixel-perfect copy.
+### 🔄 Chord Transposition
 
-PRODUCT:
+Transpose chords into different keys to match your preferred playing style and vocal range.
 
-Strumly is a guitar song/chord platform.
+### 🎼 Interactive Guitar
 
-Users can:
+An interactive guitar experience allows users to explore notes and sounds directly through the interface.
 
-- Search songs and artists
+### 📤 Upload & Convert
 
-- View lyrics with guitar chords
+Upload lyrics or song content and prepare them for a structured chord-and-lyrics experience.
 
-- Upload lyrics as text
+### ❤️ My Music
 
-- Upload lyrics as an image
+Keep track of your favorite songs, recently played songs, uploads, and personal playlists.
 
-- Convert uploaded lyrics into structured song/chord content
+### 👥 Community
 
-- Transpose songs between musical keys
+Discover arrangements, uploads, and contributions from other music lovers.
 
-- View chord diagrams
+### 🎨 Premium Music-Focused UI
 
-- Interact with a virtual guitar
+Strumly uses a warm, cinematic visual language inspired by:
 
-- Hover/touch/drag across guitar strings to produce notes
+- Acoustic guitar
+- Cozy music studios
+- Golden-hour lighting
+- Warm gradients
+- Glassmorphism
+- Minimal premium interfaces
 
-- Save/favorite songs
+---
 
-- Explore songs by genre
+## 🖥️ Current Pages
 
-- View popular/trending songs
+### 🏠 Home
 
-- Upload their own arrangements
+The Strumly landing experience featuring:
 
-DESIGN DIRECTION:
+- Hero section
+- Song search
+- Genre discovery
+- Popular songs
+- Feature highlights
+- Interactive guitar
+- Community CTA
 
-Use the attached screenshot as the primary visual reference.
+### 🔍 Explore / Search
 
-The design should feel:
+The Explore page provides:
 
-- Premium
+- Song search
+- Search results
+- Genre filtering
+- Difficulty filtering
+- Key filtering
+- Capo filtering
+- Content type filtering
+- Sorting
+- Song cards
+- Fixed cinematic background
+- Scrollable song results
+- Glassmorphism dropdown menus
 
-- Warm
+### 🎵 Song Experience
 
-- Musical
+Planned/ongoing functionality includes:
 
-- Elegant
+- Chorded lyrics
+- Key transposition
+- Capo information
+- Tuning
+- Chord diagrams
+- Auto-scroll
+- Font-size controls
+- Interactive guitar
 
-- Cinematic
+---
 
-- Sophisticated
-
-- Inviting
-
-- Human
-
-- Modern
-
-Avoid:
-
-- Cyberpunk aesthetics
-
-- Neon blue/purple
-
-- Excessive futuristic UI
-
-- Generic SaaS dashboard appearance
-
-- Overly colorful interfaces
-
-- Cheap-looking gradients
-
-- Excessive glass effects
-
-Use a warm palette:
-
-- Deep charcoal / near-black
-
-- Warm cream
-
-- Soft beige
-
-- Peach
-
-- Muted orange
-
-- Warm brown
-
-- Subtle gold accents
-
-Use glassmorphism selectively:
-
-- translucent navigation
-
-- floating cards
-
-- search bar
-
-- interactive guitar panel
-
-- CTA cards
-
-Do not make every element glassmorphic.
-
-Use:
-
-- Large elegant typography
-
-- Strong visual hierarchy
-
-- Generous spacing
-
-- Rounded corners
-
-- Soft shadows
-
-- Subtle borders
-
-- Background blur
-
-- Warm lighting
-
-- Micro-interactions
-
-- Smooth transitions
-
-The website should feel like a premium music product rather than a technology product.
-Now focus ONLY on the home page.
-
-Build the home page based on the attached reference image.
-
-HEADER:
-
-Create a transparent/glass navigation bar.
-
-Left:
-
-- Strumly logo
-
-- guitar-pick inspired logo icon
-
-- "Strumly" wordmark
-
-Navigation:
-
-- Explore
-
-- Top Charts
-
-- Upload
-
-- My Music
-
-- Community
-
-Right:
-
-- Search icon
-
-- Notifications
-
-- User avatar
-
-Remove the light/dark theme toggle.
-
-The header should blend naturally into the hero background.
-
-HERO:
-
-Use a full-width cinematic music studio/guitar background.
-
-Left side:
-
-small eyebrow text:
-
-"CHORDS BRING PEOPLE CLOSER"
-
-Large headline:
-
-"Every song is closer
-
-than you think."
-
-Highlight the word "closer" using a warm peach/orange accent.
-
-Description:
-
-"Search, explore, upload and play your favourite songs with chords.
-
-Turn lyrics into music, one strum at a time."
-
-Below it create a large premium search bar:
-
-"Search songs, artists, chords..."
-
-Include search icon and warm rounded search button.
-
-Below search:
-
-"Try searching:"
-
-Arijit Singh
-
-Coldplay
-
-Linkin Park
-
-Ed Sheeran
-
-Anime
-
-Malayalam
-
-Trending
-
-Make these interactive chips with hover animations.
-
-STATS:
-
-Show:
-
-1M+ Songs & Chords
-
-250K+ Community Members
-
-100% Music Lovers
-
-Use elegant icons and subtle hover animations.
-
-RIGHT SIDE:
-
-Create an interactive guitar showcase.
-
-Use a realistic acoustic guitar image/illustration.
-
-Add a floating glass card:
-
-"Interactive Guitar"
-
-"Hover or drag to strum"
-
-Make the guitar visually prominent but don't allow it to overpower the hero text.
-
-Add subtle floating decorative elements around the guitar.
-
-GENRE SECTION:
-
-Heading:
-
-"Explore by Genre"
-
-Create horizontally scrollable cards:
-
-Pop
-
-Rock
-
-Acoustic
-
-Indie
-
-Classical
-
-Anime
-
-Malayalam
-
-Trending
-
-Use beautiful photographic imagery.
-
-Each card should have:
-
-- image
-
-- subtle dark gradient
-
-- genre name
-
-- icon
-
-Add smooth hover:
-
-- slight scale
-
-- image zoom
-
-- brighter border
-
-- subtle elevation
-
-QUOTE:
-
-Instead of using a famous person's quote, use the Strumly brand quote:
-
-"Good songs find you,
-
-but great songs stay with you."
-
-— Strumly
-
-Make this section subtle and emotional rather than looking like a generic testimonial.
-
-BOTTOM CTA:
-
-Create a floating glass CTA:
-
-"Join a growing community of music lovers."
-
-Button:
-
-"Get Started →"
-
-Add tiny circular user avatars.
-
-Make the entire page responsive.
-
-This project was built with [Lovable](https://lovable.dev).
-
-## Build with Lovable
-
-Continue developing this project in the [Lovable editor](https://lovable.dev/projects/094d1344-67dc-44b1-a4cc-1e8262027d61).
-
-- **Ship faster**: describe what you want to build and Lovable handles the code.
-- **Stay in sync**: every change made in Lovable is committed straight to this repository.
-- **Full ownership**: this code is yours. Push to `main` on GitHub and your changes sync back into Lovable, ready for your next prompt.
-
-## Development
-
-Prefer working locally? You need Node.js and npm — [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating).
-
-```sh
-git clone <this-repository-url>
-cd <repository-name>
-npm i
-npm run dev
-```
+## 🛠️ Tech Stack
+
+### Frontend
+
+- ⚛️ React
+- 🟦 TypeScript
+- 🧭 TanStack Router
+- 🎨 Tailwind CSS
+- 🧩 shadcn/ui
+- 🎸 Lucide Icons
+- ⚡ Vite / TanStack Start architecture
+
+### Backend
+
+The Strumly backend is being developed separately and will provide the APIs required for:
+
+- Authentication
+- Song data
+- Lyrics
+- Chords
+- Upload processing
+- Transposition
+- Favorites
+- User data
+- Community features
+
+The frontend is structured to connect with the backend through a dedicated service/API layer.
+
+---
+
+## 🏗️ Project Structure
+
+```text
+Strumly/
+│
+├── public/
+│
+├── src/
+│   │
+│   ├── assets/
+│   │   └── search.jpeg
+│   │
+│   ├── components/
+│   │   └── ui/
+│   │
+│   ├── routes/
+│   │   ├── index.tsx
+│   │   ├── search.tsx
+│   │   └── ...
+│   │
+│   ├── services/
+│   │   └── catalog.ts
+│   │
+│   ├── styles.css
+│   └── ...
+│
+├── package.json
+├── tsconfig.json
+├── vite.config.ts
+└── README.md
