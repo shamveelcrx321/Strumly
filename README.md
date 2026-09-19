@@ -419,10 +419,3 @@ Project repository: [github.com/shamveelcrx321/Strumly](https://github.com/shamv
 
 ---
 
-<div align="center">
-
-**Built for guitar players, by guitar-lovers.** 🎶
-
-*Every song is closer than you think.*
-
-</div>
