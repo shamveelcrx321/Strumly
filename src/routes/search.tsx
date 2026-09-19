@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
+import { AccountDropdown } from "@/components/AccountDropdown";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Select,
@@ -129,7 +130,7 @@ function NavBar() {
         {["Explore", "Top Charts", "Upload", "My Music"].map((item, i) => (
           <a
             key={item}
-            href={item === "Explore" ? "/search" : item === "Upload" ? "/upload" : `/#${item.toLowerCase().replace(" ", "-")}`}
+            href={item === "Explore" ? "/search" : item === "Upload" ? "/upload" : item === "My Music" ? "/login" : `/#${item.toLowerCase().replace(" ", "-")}`}
             className={`rounded-xl px-4 py-2.5 text-sm font-medium transition ${i === 0 ? "border border-glass-border bg-glass text-foreground backdrop-blur-md" : "text-foreground/75 hover:text-foreground"}`}
           >
             {item}
@@ -141,8 +142,7 @@ function NavBar() {
           <Bell />
           <span className="absolute right-2 top-2 size-2 rounded-full bg-primary" />
         </Button>
-        <button className="size-9 overflow-hidden rounded-full border border-glass-border bg-primary text-xs font-bold text-primary-foreground" aria-label="Open profile">PA</button>
-        <ChevronDown size={15} className="hidden text-foreground/70 sm:block" />
+        <AccountDropdown />
       </div>
     </header>
   );

@@ -17,7 +17,10 @@ import {
   Volume2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { AccountDropdown } from "@/components/AccountDropdown";
 import { Skeleton } from "@/components/ui/skeleton";
+import { toast } from "sonner";
+import { useAuth } from "@/lib/auth-context";
 import studioImage from "@/assets/strumly-studio.jpg";
 import { songService } from "@/services/song-service";
 import type { SongDetail, SongSummary } from "@/services/song-types";
@@ -69,7 +72,7 @@ function NavBar() {
           { label: "Explore", href: "/search", active: true },
           { label: "Top Charts", href: "/#top-charts" },
           { label: "Upload", href: "/upload" },
-          { label: "My Music", href: "/#my-music" },
+          { label: "My Music", href: "/login" },
           { label: "Community", href: "/#community" },
         ].map((item) => (
           <Link
@@ -90,13 +93,7 @@ function NavBar() {
           <Bell />
           <span className="absolute right-2 top-2 size-2 rounded-full bg-primary" />
         </Button>
-        <button
-          className="size-9 overflow-hidden rounded-full border border-glass-border bg-primary text-xs font-bold text-primary-foreground"
-          aria-label="Open profile"
-        >
-          PA
-        </button>
-        <ChevronDown size={15} className="hidden text-foreground/70 sm:block" />
+        <AccountDropdown />
       </div>
     </header>
   );
@@ -119,6 +116,30 @@ function SongDetailPage() {
   const [fontSizeIndex, setFontSizeIndex] = useState(1); // 0: small, 1: medium, 2: large
   const [isFavorited, setIsFavorited] = useState(false);
   const [activeChord, setActiveChord] = useState<string>("");
+
+  const { isAuthenticated } = useAuth();
+
+  const handleToggleFavorite = () => {
+    if (!isAuthenticated) {
+      toast.info("Please sign in to save songs to your favorites.", {
+        action: {
+          label: "Sign In",
+          onClick: () => {
+            void navigate({ to: "/login", search: { redirect: `/song/${id}` } });
+          },
+        },
+      });
+      return;
+    }
+
+    const next = !isFavorited;
+    setIsFavorited(next);
+    if (next) {
+      toast.success("Saved to favorites!");
+    } else {
+      toast.info("Removed from favorites.");
+    }
+  };
 
   // Auto-scroll state
   const [autoScroll, setAutoScroll] = useState(false);
@@ -366,7 +387,7 @@ function SongDetailPage() {
                   <Button
                     variant="glass"
                     size="sm"
-                    onClick={() => setIsFavorited(!isFavorited)}
+                    onClick={handleToggleFavorite}
                     className="h-10 rounded-xl px-4 gap-2 text-xs font-medium cursor-pointer"
                     aria-label={isFavorited ? "Favorited" : "Add to favorites"}
                   >

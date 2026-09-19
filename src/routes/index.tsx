@@ -20,6 +20,7 @@ import {
   Zap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { AccountDropdown } from "@/components/AccountDropdown";
 import { stats, suggestedSearches, musicQuotes } from "@/services/catalog";
 import studioImage from "@/assets/strumly-studio.jpg";
 import popImage from "@/assets/genre-pop.jpg";
@@ -92,12 +93,11 @@ function StrumlyHome() {
             <span className="truncate font-display text-2xl font-extrabold">Strumly</span>
           </a>
           <nav className="ml-7 hidden items-center gap-1 lg:flex" aria-label="Primary navigation">
-            {['Explore','Top Charts','Upload','My Music'].map((item) => <a key={item} href={item === 'Explore' ? '/search' : item === 'Upload' ? '/upload' : `#${item.toLowerCase().replace(' ','-')}`} className="rounded-xl px-4 py-2.5 text-sm font-medium transition text-foreground/75 hover:text-foreground">{item}</a>)}
+            {['Explore','Top Charts','Upload','My Music'].map((item) => <a key={item} href={item === 'Explore' ? '/search' : item === 'Upload' ? '/upload' : item === 'My Music' ? '/login' : `#${item.toLowerCase().replace(' ','-')}`} className="rounded-xl px-4 py-2.5 text-sm font-medium transition text-foreground/75 hover:text-foreground">{item}</a>)}
           </nav>
           <div className="ml-auto flex shrink-0 items-center gap-2 sm:gap-3">
             <Button variant="ghost" size="icon" aria-label="Notifications" className="relative"><Bell /><span className="absolute right-2 top-2 size-2 rounded-full bg-primary" /></Button>
-            <button className="size-9 overflow-hidden rounded-full border border-glass-border bg-primary text-xs font-bold text-primary-foreground" aria-label="Open profile">PA</button>
-            <ChevronDown size={15} className="hidden text-foreground/70 sm:block" />
+            <AccountDropdown />
           </div>
         </header>
 

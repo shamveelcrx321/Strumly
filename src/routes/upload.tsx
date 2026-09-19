@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useState, useRef, type ChangeEvent, type DragEvent } from "react";
+import { useState, useRef, useEffect, type ChangeEvent, type DragEvent } from "react";
 import {
   ArrowRight,
   Compass,
@@ -23,6 +23,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { AccountDropdown } from "@/components/AccountDropdown";
+import { useAuth } from "@/lib/auth-context";
 import {
   Select,
   SelectContent,
@@ -81,6 +83,14 @@ const TUNING_OPTIONS = [
 
 function UploadPage() {
   const navigate = useNavigate();
+  const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
+
+  useEffect(() => {
+    if (!isAuthLoading && !isAuthenticated) {
+      toast.info("Please sign in to upload songs to Strumly.");
+      void navigate({ to: "/login", search: { redirect: "/upload" } });
+    }
+  }, [isAuthLoading, isAuthenticated, navigate]);
 
   // Mode: "type" | "file"
   const [inputMode, setInputMode] = useState<"type" | "file">("type");
@@ -318,13 +328,13 @@ function UploadPage() {
             Community
           </a>
 
-          <a
-            href="/#my-music"
+          <Link
+            to="/login"
             className="flex items-center gap-2 rounded-xl px-3.5 py-2 text-sm font-medium text-foreground/75 transition hover:text-foreground"
           >
             <Music size={16} />
             My Music
-          </a>
+          </Link>
         </nav>
 
         {/* Right: Search Pill & Avatar */}
@@ -339,12 +349,7 @@ function UploadPage() {
             />
           </form>
 
-          <button
-            className="grid size-9 place-items-center rounded-full border border-glass-border bg-peach text-xs font-bold text-black shadow-sm cursor-pointer hover:brightness-105"
-            aria-label="User Profile"
-          >
-            PA
-          </button>
+          <AccountDropdown />
         </div>
       </header>
 
