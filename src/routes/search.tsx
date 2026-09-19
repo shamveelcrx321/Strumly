@@ -10,6 +10,8 @@ import {
   Music4,
   Search,
   SlidersHorizontal,
+  Sparkles,
+  TrendingUp,
   X,
 } from "lucide-react";
 import { z } from "zod";
@@ -28,11 +30,11 @@ import {
   type SortOption,
   type Genre,
   type Difficulty,
-  mockSongs,
   searchSongs,
   suggestedSearches,
   musicQuotes,
 } from "@/services/catalog";
+
 import studioImage from "@/assets/strumly-studio.jpg";
 
 // ─── Route ────────────────────────────────────────────────────────────────────
@@ -92,6 +94,24 @@ const DIFFICULTY_STYLES: Record<Difficulty, string> = {
   Advanced:     "bg-rose-900/50 text-rose-300 border-rose-700/30",
 };
 
+const RECOMMENDED_IDS = [
+  "until-i-found-you",
+  "perfect",
+  "die-with-a-smile",
+  "a-sky-full-of-stars",
+  "kesariya",
+  "numb",
+];
+
+const POPULAR_IDS = [
+  "creep",
+  "yellow",
+  "blinding-lights",
+  "channa-mereya",
+  "believer",
+  "faint",
+];
+
 // ─── Shared Navbar ────────────────────────────────────────────────────────────
 
 function NavBar() {
@@ -106,10 +126,10 @@ function NavBar() {
         </div>
       </Link>
       <nav className="ml-7 hidden items-center gap-1 lg:flex" aria-label="Primary navigation">
-        {["Explore", "Top Charts", "Upload", "My Music", "Community"].map((item, i) => (
+        {["Explore", "Top Charts", "Upload", "My Music"].map((item, i) => (
           <a
             key={item}
-            href={i === 0 ? "/search" : `/#${item.toLowerCase().replace(" ", "-")}`}
+            href={item === "Explore" ? "/search" : item === "Upload" ? "/upload" : `/#${item.toLowerCase().replace(" ", "-")}`}
             className={`rounded-xl px-4 py-2.5 text-sm font-medium transition ${i === 0 ? "border border-glass-border bg-glass text-foreground backdrop-blur-md" : "text-foreground/75 hover:text-foreground"}`}
           >
             {item}
@@ -287,7 +307,8 @@ function FilterGroup({ label, children }: { label: string; children: React.React
 function SongCard({ song, onFavorite }: { song: Song; onFavorite: (id: string) => void }) {
   return (
     <Link
-      to="/"
+      to="/song/$id"
+      params={{ id: song.id }}
       className="group relative flex cursor-pointer gap-0 overflow-hidden rounded-2xl border border-glass-border bg-glass/40 backdrop-blur-sm transition duration-300 hover:-translate-y-0.5 hover:border-primary/40 hover:bg-glass/60 hover:shadow-[0_8px_32px_oklch(0_0_0/40%)]"
       aria-label={`${song.title} by ${song.artist}`}
     >
@@ -425,7 +446,7 @@ function EmptyState({
       </div>
       <h2 className="font-display text-lg font-semibold text-cream">No songs found</h2>
       <p className="mt-1.5 max-w-xs text-sm text-warm-muted">
-        Try a different search term, or clear your filters.
+        Try another song, artist, or genre.
       </p>
       {onClear && (
         <Button variant="glass" size="sm" className="mt-4" onClick={onClear}>
@@ -503,24 +524,62 @@ function SearchPage() {
   const [randomQuote] = useState(
     () => musicQuotes[Math.floor(Math.random() * musicQuotes.length)] || musicQuotes[0],
   );
-  const [favorites, setFavorites] = useState<Set<string>>(
-    () => new Set(mockSongs.filter((s) => s.isFavorited).map((s) => s.id)),
-  );
+  const [favorites, setFavorites] = useState<Set<string>>(() => new Set<string>());
+  const [catalogSongs, setCatalogSongs] = useState<Song[]>([]);
 
   const inputRef = useRef<HTMLInputElement>(null);
 
+  const pool = catalogSongs.length > 0 ? catalogSongs : songs;
+
+  const recommendedSongs = RECOMMENDED_IDS.map((id) => {
+    const s = pool.find((item) => item.id === id);
+    return s ? { ...s, isFavorited: favorites.has(s.id) } : null;
+  }).filter(Boolean) as Song[];
+
+  const popularSongs = POPULAR_IDS.map((id) => {
+    const s = pool.find((item) => item.id === id);
+    return s ? { ...s, isFavorited: favorites.has(s.id) } : null;
+  }).filter(Boolean) as Song[];
+
   // Run search on query/filters/sort change
   useEffect(() => {
+    let isCancelled = false;
     setIsLoading(true);
-    const timeout = setTimeout(() => {
-      const results = searchSongs(query, filters, sort).map((s) => ({
-        ...s,
-        isFavorited: favorites.has(s.id),
-      }));
-      setSongs(results);
-      setIsLoading(false);
+
+    const isDefaultCatalog =
+      !query &&
+      !filters.genre &&
+      !filters.difficulty &&
+      !filters.key &&
+      !filters.capo;
+
+    const timeout = setTimeout(async () => {
+      try {
+        const results = await searchSongs(query, filters, sort);
+        if (isCancelled) return;
+
+        const withFavs = results.map((s) => ({
+          ...s,
+          isFavorited: favorites.has(s.id),
+        }));
+
+        setSongs(withFavs);
+        if (isDefaultCatalog) {
+          setCatalogSongs(withFavs);
+        }
+        setIsLoading(false);
+      } catch (err) {
+        if (!isCancelled) {
+          console.error("Failed to search songs:", err);
+          setIsLoading(false);
+        }
+      }
     }, 450);
-    return () => clearTimeout(timeout);
+
+    return () => {
+      isCancelled = true;
+      clearTimeout(timeout);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query, filters, sort]);
 
@@ -553,13 +612,18 @@ function SearchPage() {
   const toggleFavorite = (id: string) => {
     setFavorites((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
       return next;
     });
     setSongs((prev) =>
-      prev.map((s) => s.id === id ? { ...s, isFavorited: !s.isFavorited } : s),
+      prev.map((s) => (s.id === id ? { ...s, isFavorited: !s.isFavorited } : s)),
+    );
+    setCatalogSongs((prev) =>
+      prev.map((s) => (s.id === id ? { ...s, isFavorited: !s.isFavorited } : s)),
     );
   };
+
 
   const handleSuggest = (s: string) => {
     setInputValue(s);
@@ -700,74 +764,124 @@ function SearchPage() {
                   {Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)}
                 </div>
               ) : !query && !hasActiveFilters ? (
-                <div className="animate-flow-5">
-                  <EmptyState variant="no-query" onSuggest={handleSuggest} />
+                <div className="space-y-6 pb-6 animate-flow-5">
+                  {/* Recommended Section */}
+                  <section aria-label="Recommended for you">
+                    <div className="mb-3 flex items-center justify-between">
+                      <h2 className="font-display text-base font-bold text-cream sm:text-lg flex items-center gap-2">
+                        <Sparkles size={16} className="text-peach" />
+                        Recommended for you
+                      </h2>
+                      <span className="text-xs text-warm-muted">Handpicked arrangements</span>
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                      {recommendedSongs.map((song, idx) => (
+                        <div
+                          key={song.id}
+                          className="animate-card-flow"
+                          style={{ animationDelay: `${80 + Math.min(idx, 6) * 20}ms` }}
+                        >
+                          <SongCard song={song} onFavorite={toggleFavorite} />
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+
+                  {/* Popular Section */}
+                  <section aria-label="Popular on Strumly" className="pt-2">
+                    <div className="mb-3 flex items-center justify-between">
+                      <h2 className="font-display text-base font-bold text-cream sm:text-lg flex items-center gap-2">
+                        <TrendingUp size={16} className="text-peach" />
+                        Popular on Strumly
+                      </h2>
+                      <span className="text-xs text-warm-muted">Top played this week</span>
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                      {popularSongs.map((song, idx) => (
+                        <div
+                          key={song.id}
+                          className="animate-card-flow"
+                          style={{ animationDelay: `${100 + Math.min(idx, 6) * 20}ms` }}
+                        >
+                          <SongCard song={song} onFavorite={toggleFavorite} />
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+
+                  {/* Suggested searches when empty */}
+                  <div className="mt-6 border-t border-glass-border pt-4">
+                    <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-foreground/40">
+                      Try searching for
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {suggestedSearches.map((s) => (
+                        <button
+                          key={s}
+                          onClick={() => handleSuggest(s)}
+                          className="rounded-full border border-glass-border bg-glass px-4 py-2 text-sm text-foreground/70 backdrop-blur-md transition hover:bg-glass-hover hover:text-foreground cursor-pointer"
+                        >
+                          {s}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Footer quote */}
+                  <footer className="mt-8 mb-4 flex items-center justify-center gap-3 border-t border-glass-border/40 pt-4 text-center">
+                    <blockquote className="text-xs text-cream/50">
+                      <span className="italic">"{randomQuote?.quote}"</span>{" "}
+                      <span className="text-warm-muted/70">— {randomQuote?.author}</span>
+                    </blockquote>
+                  </footer>
                 </div>
               ) : songs.length === 0 ? (
                 <div className="animate-flow-5">
                   <EmptyState variant="no-results" onClear={() => { clearFilters(); handleClear(); }} />
                 </div>
               ) : (
-                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                  {songs.map((song, idx) => (
-                    <div
-                      key={song.id}
-                      className="animate-card-flow"
-                      style={{ animationDelay: `${140 + Math.min(idx, 8) * 20}ms` }}
-                    >
-                      <SongCard song={song} onFavorite={toggleFavorite} />
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* "Didn't find what you're looking for?" CTA */}
-              {!isLoading && query && songs.length > 0 && (
-                <div className="mt-4 flex items-center justify-between gap-4 rounded-2xl border border-glass-border bg-glass/40 p-4 backdrop-blur-sm animate-flow-6">
-                  <div className="flex items-center gap-4">
-                    <div className="grid size-10 shrink-0 place-items-center rounded-[42%_42%_52%_52%] bg-primary/20 text-primary">
-                      <Guitar size={20} />
-                    </div>
-                    <div>
-                      <p className="font-semibold text-cream text-sm">Didn't find what you're looking for?</p>
-                      <p className="text-xs text-warm-muted mt-0.5">
-                        Try a different search term, or check out our top charts for popular songs.
-                      </p>
-                    </div>
-                  </div>
-                  <Button variant="warm" size="sm" className="shrink-0">
-                    Explore Top Charts <ArrowRight size={14} />
-                  </Button>
-                </div>
-              )}
-
-              {/* Suggested searches when empty */}
-              {!query && !isLoading && (
-                <div className="mt-6 border-t border-glass-border pt-4 animate-flow-6">
-                  <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-foreground/40">
-                    Try searching for
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    {suggestedSearches.map((s) => (
-                      <button
-                        key={s}
-                        onClick={() => handleSuggest(s)}
-                        className="rounded-full border border-glass-border bg-glass px-4 py-2 text-sm text-foreground/70 backdrop-blur-md transition hover:bg-glass-hover hover:text-foreground"
+                <div className="space-y-4">
+                  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                    {songs.map((song, idx) => (
+                      <div
+                        key={song.id}
+                        className="animate-card-flow"
+                        style={{ animationDelay: `${140 + Math.min(idx, 8) * 20}ms` }}
                       >
-                        {s}
-                      </button>
+                        <SongCard song={song} onFavorite={toggleFavorite} />
+                      </div>
                     ))}
                   </div>
+
+                  {/* "Didn't find what you're looking for?" CTA */}
+                  {!isLoading && query && songs.length > 0 && (
+                    <div className="mt-4 flex items-center justify-between gap-4 rounded-2xl border border-glass-border bg-glass/40 p-4 backdrop-blur-sm animate-flow-6">
+                      <div className="flex items-center gap-4">
+                        <div className="grid size-10 shrink-0 place-items-center rounded-[42%_42%_52%_52%] bg-primary/20 text-primary">
+                          <Guitar size={20} />
+                        </div>
+                        <div>
+                          <p className="font-semibold text-cream text-sm">Didn't find what you're looking for?</p>
+                          <p className="text-xs text-warm-muted mt-0.5">
+                            Try a different search term, or check out our top charts for popular songs.
+                          </p>
+                        </div>
+                      </div>
+                      <Button variant="warm" size="sm" className="shrink-0">
+                        Explore Top Charts <ArrowRight size={14} />
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* Footer quote */}
+                  <footer className="mt-8 mb-4 flex items-center justify-center gap-3 border-t border-glass-border/40 pt-4 text-center animate-flow-6">
+                    <blockquote className="text-xs text-cream/50">
+                      <span className="italic">"{randomQuote?.quote}"</span>{" "}
+                      <span className="text-warm-muted/70">— {randomQuote?.author}</span>
+                    </blockquote>
+                  </footer>
                 </div>
               )}
-
-              {/* Footer quote */}
-              <footer className="mt-8 mb-4 flex items-center justify-center gap-3 border-t border-glass-border/40 pt-4 text-center animate-flow-6">
-                <blockquote className="text-xs text-cream/50">
-                  <span className="italic">"{randomQuote?.quote}"</span>{" "}
-                  <span className="text-warm-muted/70">— {randomQuote?.author}</span>
-                </blockquote>
-              </footer>
             </div>
           </div>
         </div>
