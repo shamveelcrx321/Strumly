@@ -1,4 +1,3 @@
-<div align="center">
 
 # 🎸 Strumly
 
@@ -11,8 +10,6 @@ A modern, guitar-first music platform to discover songs, read lyrics and chords,
 **Status:** Active development
 
 **Built with:** React · TypeScript · TanStack Start · TanStack Router · Tailwind CSS · Vite · Supabase · PostgreSQL
-
-</div>
 
 ---
 
