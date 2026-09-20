@@ -83,13 +83,12 @@ export function AccountDropdown({
   // Generate 2-letter initials from name or email
   const computedInitials = React.useMemo(() => {
     if (avatarInitials) return avatarInitials;
-    if (!effectiveLoggedIn) return "PA";
     const parts = rawName.trim().split(/\s+/);
     if (parts.length >= 2 && parts[0] && parts[1]) {
       return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
     }
     return rawName.slice(0, 2).toUpperCase();
-  }, [avatarInitials, effectiveLoggedIn, rawName]);
+  }, [avatarInitials, rawName]);
 
   const handleSignOut = async () => {
     await signOut();
@@ -105,16 +104,20 @@ export function AccountDropdown({
           aria-label="Open profile menu"
         >
           <span className="grid size-9 shrink-0 place-items-center overflow-hidden rounded-full border border-glass-border bg-primary text-xs font-bold text-primary-foreground shadow-sm transition group-hover:scale-105 group-hover:border-primary/80">
-            {resolvedAvatarUrl ? (
-              <img
-                src={resolvedAvatarUrl}
-                alt={rawName}
-                onError={() => setImageError(true)}
-                className="h-full w-full object-cover"
-                referrerPolicy="no-referrer"
-              />
+            {effectiveLoggedIn ? (
+              resolvedAvatarUrl ? (
+                <img
+                  src={resolvedAvatarUrl}
+                  alt={rawName}
+                  onError={() => setImageError(true)}
+                  className="h-full w-full object-cover"
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                computedInitials
+              )
             ) : (
-              computedInitials
+              <User size={18} className="text-primary-foreground" />
             )}
           </span>
           <ChevronDown

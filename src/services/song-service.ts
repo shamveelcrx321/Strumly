@@ -47,12 +47,27 @@ export interface CreateSongInput {
   lyricsText: string;
 }
 
+export interface FavoriteRecord {
+  id: string;
+  user_id: string;
+  song_id: string;
+  created_at: string;
+}
+
 export interface SongService {
   getSongs(forceRefresh?: boolean): Promise<Song[]>;
   getSong(id: string): Promise<SongDetail | null>;
   getRelatedSongs(currentSong: SongDetail, limit?: number): Promise<SongSummary[]>;
   getAllSongs(): Promise<SongSummary[]>;
   createSong(input: CreateSongInput): Promise<string>;
+  resolveSongUuid(songIdOrSlug: string): Promise<string | null>;
+  getFavorites(): Promise<FavoriteRecord[]>;
+  getFavoriteSongs(): Promise<Song[]>;
+  getFavoriteSongIds(): Promise<string[]>;
+  isFavorite(songIdOrSlug: string): Promise<boolean>;
+  addFavorite(songIdOrSlug: string): Promise<boolean>;
+  removeFavorite(songIdOrSlug: string): Promise<boolean>;
+  toggleFavorite(songIdOrSlug: string): Promise<boolean>;
 }
 
 function parseLyricsIntoSections(lyricsText: string): {
@@ -117,6 +132,37 @@ function parseLyricsIntoSections(lyricsText: string): {
   }
 
   return { sections, chords: Array.from(foundChords) };
+}
+
+interface DatabaseSongRow {
+  id: string;
+  slug?: string | null;
+  title?: string | null;
+  artist?: string | null;
+  genre?: string | null;
+  difficulty?: string | null;
+  song_key?: string | null;
+  capo?: number | null;
+  tuning?: string | null;
+  chord_count?: number | null;
+  popularity?: number | null;
+  album?: string | null;
+  art_color?: string | null;
+  added_at?: string | null;
+  created_at?: string | null;
+  duration?: string | null;
+  chords?: unknown;
+  sections?: unknown;
+  lyrics?: string | null;
+  author?: string | null;
+}
+
+interface FavoriteQueryRow {
+  id: string;
+  user_id: string;
+  song_id: string;
+  created_at: string;
+  songs?: DatabaseSongRow | null;
 }
 
 class SupabaseSongService implements SongService {
@@ -444,6 +490,395 @@ class SupabaseSongService implements SongService {
     this.cachedSongs = null; // Invalidate catalog cache
     return finalId;
   }
+
+  // ─── Favorites Implementation ──────────────────────────────────────────
+
+  private slugToUuidMap = new Map<string, string>();
+  private uuidToSlugMap = new Map<string, string>();
+  private readonly UUID_REGEX =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+  async resolveSongUuid(songIdOrSlug: string): Promise<string | null> {
+    if (!songIdOrSlug || typeof songIdOrSlug !== "string") return null;
+    const trimmed = songIdOrSlug.trim();
+    if (!trimmed) return null;
+
+    if (this.UUID_REGEX.test(trimmed)) {
+      return trimmed;
+    }
+
+    if (this.slugToUuidMap.has(trimmed)) {
+      return this.slugToUuidMap.get(trimmed)!;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from("songs")
+        .select("id, slug")
+        .eq("slug", trimmed)
+        .maybeSingle();
+
+      if (!error && data?.id) {
+        this.slugToUuidMap.set(trimmed, data.id);
+        if (data.slug) this.uuidToSlugMap.set(data.id, data.slug);
+        return data.id;
+      }
+    } catch (err) {
+      console.warn("Failed to resolve song UUID by slug:", err);
+    }
+
+    return null;
+  }
+
+  private async getEffectiveUser(): Promise<{ id: string } | null> {
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (user?.id) return user;
+    } catch {
+      // ignore
+    }
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (session?.user?.id) return session.user;
+    } catch {
+      // ignore
+    }
+    return null;
+  }
+
+  async getFavorites(): Promise<FavoriteRecord[]> {
+    try {
+      const user = await this.getEffectiveUser();
+      if (!user) return [];
+
+      const { data, error } = await supabase
+        .from("favorites")
+        .select("id, user_id, song_id, created_at")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        console.error("Failed to load favorites:", error.message);
+        return [];
+      }
+      return data ?? [];
+    } catch (err) {
+      console.error("Unexpected error loading favorites:", err);
+      return [];
+    }
+  }
+
+  async getFavoriteSongs(): Promise<Song[]> {
+    try {
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
+
+      const currentUser =
+        user || (await supabase.auth.getSession()).data?.session?.user;
+
+      console.log("Current user:", currentUser?.id);
+      if (userError) {
+        console.warn("Supabase getUser error in getFavoriteSongs:", userError);
+      }
+
+      if (!currentUser) {
+        return [];
+      }
+
+      // Step 1: Fetch user's favorites from public.favorites
+      const { data: favorites, error: favError } = await supabase
+        .from("favorites")
+        .select(`
+          id,
+          song_id,
+          created_at
+        `)
+        .eq("user_id", currentUser.id)
+        .order("created_at", { ascending: false });
+
+      if (favError) {
+        console.error("Failed to fetch favorites from Supabase:", favError);
+        return [];
+      }
+
+      console.log("Favorites from Supabase:", favorites);
+
+      if (!favorites || favorites.length === 0) {
+        console.log("Favorite song IDs:", []);
+        console.log("Resolved songs:", []);
+        return [];
+      }
+
+      // Step 2: Extract the song UUIDs
+      const songIds = favorites.map((favorite) => favorite.song_id).filter(Boolean);
+      console.log("Favorite song IDs:", songIds);
+
+      if (songIds.length === 0) {
+        console.log("Resolved songs:", []);
+        return [];
+      }
+
+      // Step 3: Resolve song UUIDs against public.songs.id
+      const { data: songs, error: songsError } = await supabase
+        .from("songs")
+        .select("*")
+        .in("id", songIds);
+
+      if (songsError) {
+        console.error("Failed to fetch songs from public.songs:", songsError);
+        return [];
+      }
+
+      console.log("Resolved songs:", songs);
+
+      const typedSongs = (songs || []) as DatabaseSongRow[];
+      const songMap = new Map<string, DatabaseSongRow>();
+      for (const s of typedSongs) {
+        songMap.set(s.id, s);
+      }
+
+      // Step 4: Map to application Song shape preserving user's favorite order (created_at DESC)
+      const mappedSongs: Song[] = [];
+      for (const fav of favorites) {
+        const row = songMap.get(fav.song_id);
+        if (!row) continue;
+
+        // Cache slug <-> UUID mappings
+        if (row.slug && row.id) {
+          this.slugToUuidMap.set(row.slug, row.id);
+          this.uuidToSlugMap.set(row.id, row.slug);
+        }
+
+        mappedSongs.push({
+          id: row.slug || row.id, // Application UI/catalog identifier (slug)
+          title: row.title ?? "",
+          artist: row.artist ?? "",
+          genre: (row.genre as Genre) || "Pop",
+          key: row.song_key ?? "C",
+          capo: typeof row.capo === "number" ? row.capo : 0,
+          difficulty: (row.difficulty as Difficulty) || "Intermediate",
+          chordCount: typeof row.chord_count === "number" ? row.chord_count : 0,
+          popularity: typeof row.popularity === "number" ? row.popularity : 0,
+          addedAt:
+            row.added_at ||
+            (row.created_at
+              ? row.created_at.split("T")[0]
+              : new Date().toISOString().split("T")[0]),
+          isFavorited: true,
+          ...(row.album ? { album: row.album } : {}),
+          artColor: row.art_color || "from-stone-700 to-amber-900",
+        });
+      }
+
+      return mappedSongs;
+    } catch (err) {
+      console.error("Unexpected error fetching favorite songs:", err);
+      return [];
+    }
+  }
+
+  async getFavoriteSongIds(): Promise<string[]> {
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      const currentUser =
+        user || (await supabase.auth.getSession()).data?.session?.user;
+
+      if (!currentUser) return [];
+
+      const { data: favorites, error: favError } = await supabase
+        .from("favorites")
+        .select("song_id")
+        .eq("user_id", currentUser.id);
+
+      if (favError || !favorites) {
+        console.error("Error retrieving favorite IDs from Supabase:", favError);
+        return [];
+      }
+
+      const songUuids = favorites.map((f) => f.song_id).filter(Boolean);
+      if (songUuids.length === 0) return [];
+
+      const ids = new Set<string>(songUuids);
+
+      // Resolve slugs for all song UUIDs so that UI lookups with slug also match
+      const missingUuids: string[] = [];
+      for (const uuid of songUuids) {
+        const cachedSlug = this.uuidToSlugMap.get(uuid);
+        if (cachedSlug) {
+          ids.add(cachedSlug);
+        } else {
+          missingUuids.push(uuid);
+        }
+      }
+
+      if (missingUuids.length > 0) {
+        const { data: songsData } = await supabase
+          .from("songs")
+          .select("id, slug")
+          .in("id", missingUuids);
+
+        for (const s of songsData || []) {
+          if (s.slug) {
+            ids.add(s.slug);
+            this.slugToUuidMap.set(s.slug, s.id);
+            this.uuidToSlugMap.set(s.id, s.slug);
+          }
+        }
+      }
+
+      return Array.from(ids);
+    } catch (err) {
+      console.error("Error retrieving favorite song IDs:", err);
+      return [];
+    }
+  }
+
+  async isFavorite(songIdOrSlug: string): Promise<boolean> {
+    try {
+      const user = await this.getEffectiveUser();
+      if (!user) return false;
+
+      const songUuid = await this.resolveSongUuid(songIdOrSlug);
+      if (!songUuid) return false;
+
+      const { data, error } = await supabase
+        .from("favorites")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("song_id", songUuid)
+        .maybeSingle();
+
+      return !error && Boolean(data);
+    } catch (err) {
+      console.error("Error checking favorite status:", err);
+      return false;
+    }
+  }
+
+  async addFavorite(songIdOrSlug: string): Promise<boolean> {
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError) {
+      console.error("Favorite auth error:", authError);
+    }
+    console.log("Favorite auth user:", user?.id);
+
+    const effectiveUser =
+      user || (await supabase.auth.getSession()).data?.session?.user;
+
+    if (!effectiveUser) {
+      throw new Error("User must be authenticated to add favorites");
+    }
+
+    console.log("Favorite song_id (input):", songIdOrSlug);
+    const actualSupabaseSongUuid = await this.resolveSongUuid(songIdOrSlug);
+    console.log("Favorite resolved UUID:", actualSupabaseSongUuid);
+
+    if (!actualSupabaseSongUuid) {
+      const notFoundErr = new Error(`Could not resolve Supabase song ID for '${songIdOrSlug}'`);
+      console.error(notFoundErr.message);
+      throw notFoundErr;
+    }
+
+    const { data, error } = await supabase
+      .from("favorites")
+      .insert({
+        user_id: effectiveUser.id,
+        song_id: actualSupabaseSongUuid,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Supabase favorites error:", {
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+      });
+
+      // 23505 = unique_violation, song already in favorites
+      if (error.code === "23505") {
+        return true;
+      }
+      throw error;
+    }
+
+    return true;
+  }
+
+  async removeFavorite(songIdOrSlug: string): Promise<boolean> {
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError) {
+      console.error("Favorite auth error:", authError);
+    }
+    console.log("Favorite auth user:", user?.id);
+
+    const effectiveUser =
+      user || (await supabase.auth.getSession()).data?.session?.user;
+
+    if (!effectiveUser) {
+      throw new Error("User must be authenticated to remove favorites");
+    }
+
+    console.log("Favorite song_id (input):", songIdOrSlug);
+    const actualSupabaseSongUuid = await this.resolveSongUuid(songIdOrSlug);
+    console.log("Favorite resolved UUID:", actualSupabaseSongUuid);
+
+    if (!actualSupabaseSongUuid) {
+      const notFoundErr = new Error(`Could not resolve Supabase song ID for '${songIdOrSlug}'`);
+      console.error(notFoundErr.message);
+      throw notFoundErr;
+    }
+
+    const { data, error } = await supabase
+      .from("favorites")
+      .delete()
+      .eq("user_id", effectiveUser.id)
+      .eq("song_id", actualSupabaseSongUuid)
+      .select();
+
+    if (error) {
+      console.error("Supabase favorites error:", {
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+      });
+      throw error;
+    }
+
+    return true;
+  }
+
+  async toggleFavorite(songIdOrSlug: string): Promise<boolean> {
+    const isFav = await this.isFavorite(songIdOrSlug);
+    if (isFav) {
+      await this.removeFavorite(songIdOrSlug);
+      return false;
+    } else {
+      await this.addFavorite(songIdOrSlug);
+      return true;
+    }
+  }
 }
 
 export const songService: SongService = new SupabaseSongService();
+export const favoriteService = songService;
+

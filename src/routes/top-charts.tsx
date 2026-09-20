@@ -20,6 +20,7 @@ import { Navbar } from "@/components/Navbar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { songService } from "@/services/song-service";
 import type { Song } from "@/services/song-types";
+import { useFavorites } from "@/lib/favorites-context";
 import studioImage from "@/assets/strumly-studio.jpg";
 import popImage from "@/assets/genre-pop.jpg";
 import rockImage from "@/assets/genre-rock.jpg";
@@ -367,7 +368,7 @@ function TopChartsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [showAll, setShowAll] = useState(false);
   const [expandedSongId, setExpandedSongId] = useState<string | null>(null);
-  const [favorites, setFavorites] = useState<Set<string>>(() => new Set());
+  const { isFavorite, toggleFavorite } = useFavorites();
 
   // Load songs from the existing songService (Supabase-backed)
   useEffect(() => {
@@ -411,13 +412,8 @@ function TopChartsPage() {
   const INITIAL_VISIBLE = 10; // top 10 rows visible before "View Full Chart"
   const visibleSongs = showAll ? rankedSongs : rankedSongs.slice(0, INITIAL_VISIBLE);
 
-  const toggleFavorite = (id: string) => {
-    setFavorites((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+  const handleFavoriteToggle = (id: string) => {
+    void toggleFavorite(id, "/top-charts");
   };
 
   const handleGenreNavigate = (genre: string) => {
@@ -524,8 +520,8 @@ function TopChartsPage() {
                       song={song}
                       rank={idx + 1}
                       isExpanded={expandedSongId === song.id}
-                      isFav={favorites.has(song.id)}
-                      onFavorite={toggleFavorite}
+                      isFav={isFavorite(song.id)}
+                      onFavorite={handleFavoriteToggle}
                       onMouseEnter={() => setExpandedSongId(song.id)}
                       onExpand={() => setExpandedSongId(song.id)}
                     />

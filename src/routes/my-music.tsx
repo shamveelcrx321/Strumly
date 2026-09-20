@@ -1,11 +1,14 @@
 import * as React from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Heart, Music, Sparkles, Upload } from "lucide-react";
+import { Heart, Sparkles, Upload } from "lucide-react";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Navbar } from "@/components/Navbar";
+import { Skeleton } from "@/components/ui/skeleton";
+import { SongCard } from "@/components/SongCard";
 import studioImage from "@/assets/strumly-studio.jpg";
 import { useAuth } from "@/lib/auth-context";
+import { useFavorites } from "@/lib/favorites-context";
 
 const myMusicSearchSchema = z.object({
   tab: z.enum(["favorites", "uploads"]).optional().default("favorites"),
@@ -25,10 +28,38 @@ export const Route = createFileRoute("/my-music")({
   component: MyMusicPage,
 });
 
+function SkeletonCard() {
+  return (
+    <div className="flex overflow-hidden rounded-2xl border border-glass-border bg-glass/30">
+      <Skeleton className="size-[110px] shrink-0 rounded-none bg-foreground/8" />
+      <div className="flex flex-1 flex-col justify-between p-3.5 gap-2">
+        <div className="flex justify-between">
+          <div className="flex-1 space-y-2">
+            <Skeleton className="h-4 w-3/5 rounded-lg bg-foreground/8" />
+            <Skeleton className="h-3 w-2/5 rounded-md bg-foreground/8" />
+          </div>
+          <Skeleton className="size-6 rounded-full bg-foreground/8" />
+        </div>
+        <div className="flex gap-2">
+          <Skeleton className="h-5 w-14 rounded-md bg-foreground/8" />
+          <Skeleton className="h-5 w-20 rounded-md bg-foreground/8" />
+        </div>
+        <div className="flex gap-4">
+          <Skeleton className="h-3 w-16 rounded-md bg-foreground/8" />
+          <Skeleton className="h-3 w-14 rounded-md bg-foreground/8" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function MyMusicPage() {
   const { tab } = Route.useSearch();
-  const [activeTab, setActiveTab] = React.useState<"favorites" | "uploads">(tab || "favorites");
-  const { isAuthenticated, user, isLoading } = useAuth();
+  const [activeTab, setActiveTab] = React.useState<"favorites" | "uploads">(
+    tab || "favorites",
+  );
+  const { isAuthenticated, user, isLoading: isAuthLoading } = useAuth();
+  const { favoriteSongs, isLoading: isFavoritesLoading } = useFavorites();
 
   React.useEffect(() => {
     if (tab) setActiveTab(tab);
@@ -85,6 +116,11 @@ function MyMusicPage() {
           >
             <Heart size={16} className={activeTab === "favorites" ? "text-peach" : ""} />
             Favorites
+            {isAuthenticated && favoriteSongs.length > 0 && (
+              <span className="ml-1 rounded-full bg-peach/20 px-2 py-0.5 text-xs font-bold text-peach">
+                {favoriteSongs.length}
+              </span>
+            )}
           </button>
           <button
             onClick={() => setActiveTab("uploads")}
@@ -101,26 +137,74 @@ function MyMusicPage() {
 
         {/* Body Content */}
         {isAuthenticated ? (
-          <div className="mt-10 max-w-lg rounded-2xl border border-glass-border/60 bg-[#171210]/80 p-8 shadow-xl backdrop-blur-xl animate-flow-4 text-center mx-auto">
-            <div className="inline-grid size-12 place-items-center rounded-2xl bg-peach/15 text-peach mb-4">
-              <Sparkles size={24} />
+          activeTab === "favorites" ? (
+            isFavoritesLoading || isAuthLoading ? (
+              <div className="mt-8 grid gap-3 sm:grid-cols-2 xl:grid-cols-3 animate-flow-4">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <SkeletonCard key={i} />
+                ))}
+              </div>
+            ) : favoriteSongs.length === 0 ? (
+              <div className="mt-10 max-w-lg rounded-2xl border border-glass-border/60 bg-[#171210]/80 p-8 shadow-xl backdrop-blur-xl animate-flow-4 text-center mx-auto">
+                <div className="inline-grid size-12 place-items-center rounded-2xl bg-peach/15 text-peach mb-4">
+                  <Heart size={24} className="text-peach" />
+                </div>
+                <h2 className="font-display text-2xl font-bold text-cream">
+                  No favorites saved yet
+                </h2>
+                <p className="mt-2 text-sm text-cream/75 leading-relaxed">
+                  Explore songs and click the heart icon on any song to save it to your personal favorites library.
+                </p>
+                <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+                  <Button asChild variant="warm" size="hero" className="rounded-xl px-6">
+                    <Link to="/search">Explore Song Catalog</Link>
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="mt-6 space-y-4 animate-flow-4">
+                <div className="flex items-center justify-between text-xs text-warm-muted">
+                  <span>
+                    {favoriteSongs.length}{" "}
+                    {favoriteSongs.length === 1 ? "song" : "songs"} in favorites
+                  </span>
+                  <Link to="/search" className="text-peach hover:underline">
+                    Browse more songs →
+                  </Link>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                  {favoriteSongs.map((song) => (
+                    <SongCard
+                      key={song.id}
+                      song={song}
+                      redirectPath="/my-music?tab=favorites"
+                    />
+                  ))}
+                </div>
+              </div>
+            )
+          ) : (
+            <div className="mt-10 max-w-lg rounded-2xl border border-glass-border/60 bg-[#171210]/80 p-8 shadow-xl backdrop-blur-xl animate-flow-4 text-center mx-auto">
+              <div className="inline-grid size-12 place-items-center rounded-2xl bg-peach/15 text-peach mb-4">
+                <Sparkles size={24} />
+              </div>
+              <h2 className="font-display text-2xl font-bold text-cream">
+                Your Uploads
+              </h2>
+              <p className="mt-2 text-sm text-cream/75 leading-relaxed">
+                Logged in as <span className="font-semibold text-peach">{userName}</span> ({user?.email}).
+                Manage and share your custom arrangements and song lyrics.
+              </p>
+              <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+                <Button asChild variant="warm" size="hero" className="rounded-xl px-6">
+                  <Link to="/upload">Upload a New Song</Link>
+                </Button>
+                <Button asChild variant="glass" size="hero" className="rounded-xl px-6">
+                  <Link to="/search">Explore Song Catalog</Link>
+                </Button>
+              </div>
             </div>
-            <h2 className="font-display text-2xl font-bold text-cream">
-              {activeTab === "favorites" ? "Your Favorites" : "Your Uploads"}
-            </h2>
-            <p className="mt-2 text-sm text-cream/75 leading-relaxed">
-              Logged in as <span className="font-semibold text-peach">{userName}</span> ({user?.email}).
-              Your personal library will automatically synchronize with your Supabase account once user-specific data tables are connected.
-            </p>
-            <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-              <Button asChild variant="warm" size="hero" className="rounded-xl px-6">
-                <Link to="/search">Explore Song Catalog</Link>
-              </Button>
-              <Button asChild variant="glass" size="hero" className="rounded-xl px-6">
-                <Link to="/upload">Upload a New Song</Link>
-              </Button>
-            </div>
-          </div>
+          )
         ) : (
           <div className="mt-10 max-w-lg rounded-2xl border border-glass-border/60 bg-[#171210]/80 p-8 shadow-xl backdrop-blur-xl animate-flow-4 text-center mx-auto">
             <div className="inline-grid size-12 place-items-center rounded-2xl bg-peach/15 text-peach mb-4">

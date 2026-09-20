@@ -1,7 +1,11 @@
 import { createClient } from "@supabase/supabase-js";
 
-const supabaseUrl = import.meta.env["VITE_SUPABASE_URL"];
-const supabasePublishableKey = import.meta.env["VITE_SUPABASE_PUBLISHABLE_KEY"];
+const supabaseUrl =
+  (typeof import.meta !== "undefined" && import.meta.env?.["VITE_SUPABASE_URL"]) ||
+  (typeof process !== "undefined" ? process.env["VITE_SUPABASE_URL"] : undefined);
+const supabasePublishableKey =
+  (typeof import.meta !== "undefined" && import.meta.env?.["VITE_SUPABASE_PUBLISHABLE_KEY"]) ||
+  (typeof process !== "undefined" ? process.env["VITE_SUPABASE_PUBLISHABLE_KEY"] : undefined);
 
 if (!supabaseUrl || !supabasePublishableKey) {
   throw new Error("Missing Supabase environment variables");

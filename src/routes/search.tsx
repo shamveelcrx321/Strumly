@@ -4,9 +4,6 @@ import {
   ArrowRight,
   ChevronDown,
   Guitar,
-  Heart,
-  Music2,
-  Music4,
   Search,
   SlidersHorizontal,
   Sparkles,
@@ -17,6 +14,8 @@ import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Navbar } from "@/components/Navbar";
 import { Skeleton } from "@/components/ui/skeleton";
+import { SongCard } from "@/components/SongCard";
+import { useFavorites } from "@/lib/favorites-context";
 import {
   Select,
   SelectContent,
@@ -279,79 +278,7 @@ function FilterGroup({ label, children }: { label: string; children: React.React
   );
 }
 
-// ─── Song Card ────────────────────────────────────────────────────────────────
 
-function SongCard({ song, onFavorite }: { song: Song; onFavorite: (id: string) => void }) {
-  return (
-    <Link
-      to="/song/$id"
-      params={{ id: song.id }}
-      className="group relative flex cursor-pointer gap-0 overflow-hidden rounded-2xl border border-glass-border bg-glass/40 backdrop-blur-sm transition duration-300 hover:-translate-y-0.5 hover:border-primary/40 hover:bg-glass/60 hover:shadow-[0_8px_32px_oklch(0_0_0/40%)]"
-      aria-label={`${song.title} by ${song.artist}`}
-    >
-      {/* Album art thumbnail */}
-      <div className={`relative size-[110px] shrink-0 overflow-hidden bg-gradient-to-br ${song.artColor}`}>
-        {/* Subtle lighting overlay & inner shadow */}
-        <div className="absolute inset-0 bg-gradient-to-tr from-black/40 via-transparent to-white/10" />
-
-        {/* Subtle vinyl record groove ring detail */}
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <div className="size-16 rounded-full border border-white/10 bg-black/15 shadow-inner" />
-        </div>
-
-        {/* Perfectly centered music note icon */}
-        <div className="absolute inset-0 flex items-center justify-center">
-          <Music2 size={32} className="text-cream/45 drop-shadow-md transition-all duration-300 group-hover:scale-110 group-hover:text-peach/80" />
-        </div>
-
-        {/* Right side shade transition into card body */}
-        <div className="absolute inset-y-0 right-0 w-6 bg-gradient-to-r from-transparent to-black/40" />
-      </div>
-
-      {/* Info */}
-      <div className="flex min-w-0 flex-1 flex-col justify-between p-3.5">
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <p className="truncate font-display text-[15px] font-bold leading-snug text-cream group-hover:text-primary transition-colors">
-              {song.title}
-            </p>
-            <p className="truncate text-xs text-warm-muted mt-0.5">{song.artist}</p>
-          </div>
-          {/* Favorite */}
-          <button
-            onClick={(e) => { e.preventDefault(); e.stopPropagation(); onFavorite(song.id); }}
-            className="shrink-0 rounded-full p-1.5 text-foreground/30 transition hover:text-primary"
-            aria-label={song.isFavorited ? "Remove from favorites" : "Add to favorites"}
-          >
-            <Heart size={15} className={song.isFavorited ? "fill-primary text-primary" : ""} />
-          </button>
-        </div>
-
-        {/* Tags */}
-        <div className="mt-2 flex flex-wrap items-center gap-1.5">
-          <span className="rounded-md border border-glass-border bg-glass px-2 py-0.5 text-[11px] font-medium text-foreground/70">
-            {song.genre}
-          </span>
-          <span className={`rounded-md border px-2 py-0.5 text-[11px] font-medium ${DIFFICULTY_STYLES[song.difficulty]}`}>
-            {song.difficulty}
-          </span>
-        </div>
-
-        {/* Bottom meta */}
-        <div className="mt-2.5 flex items-center gap-3 text-[11px] text-foreground/50">
-          <span className="flex items-center gap-1">
-            <Music4 size={11} />
-            {song.chordCount} chords
-          </span>
-          <span className="flex items-center gap-1">
-            <span className="text-peach/70">♩</span>
-            Key: {song.key}
-          </span>
-        </div>
-      </div>
-    </Link>
-  );
-}
 
 // ─── Skeleton Card ────────────────────────────────────────────────────────────
 
@@ -504,7 +431,7 @@ function SearchPage() {
   const [randomQuote] = useState(
     () => musicQuotes[Math.floor(Math.random() * musicQuotes.length)] || musicQuotes[0],
   );
-  const [favorites, setFavorites] = useState<Set<string>>(() => new Set<string>());
+  const { isFavorite, toggleFavorite } = useFavorites();
   const [catalogSongs, setCatalogSongs] = useState<Song[]>([]);
 
   const inputRef = useRef<HTMLInputElement>(null);
@@ -513,12 +440,12 @@ function SearchPage() {
 
   const recommendedSongs = RECOMMENDED_IDS.map((id) => {
     const s = pool.find((item) => item.id === id);
-    return s ? { ...s, isFavorited: favorites.has(s.id) } : null;
+    return s ? { ...s, isFavorited: isFavorite(s.id) } : null;
   }).filter(Boolean) as Song[];
 
   const popularSongs = POPULAR_IDS.map((id) => {
     const s = pool.find((item) => item.id === id);
-    return s ? { ...s, isFavorited: favorites.has(s.id) } : null;
+    return s ? { ...s, isFavorited: isFavorite(s.id) } : null;
   }).filter(Boolean) as Song[];
 
   // Run search on query/filters/sort change
@@ -540,7 +467,7 @@ function SearchPage() {
 
         const withFavs = results.map((s) => ({
           ...s,
-          isFavorited: favorites.has(s.id),
+          isFavorited: isFavorite(s.id),
         }));
 
         setSongs(withFavs);
@@ -561,7 +488,7 @@ function SearchPage() {
       clearTimeout(timeout);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query, filters, sort]);
+  }, [query, filters, sort, isFavorite]);
 
   // Sync URL search query → state
   useEffect(() => {
@@ -600,19 +527,8 @@ function SearchPage() {
     void navigate({ search: (prev) => ({ ...prev, genre: "" }) });
   };
 
-  const toggleFavorite = (id: string) => {
-    setFavorites((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-    setSongs((prev) =>
-      prev.map((s) => (s.id === id ? { ...s, isFavorited: !s.isFavorited } : s)),
-    );
-    setCatalogSongs((prev) =>
-      prev.map((s) => (s.id === id ? { ...s, isFavorited: !s.isFavorited } : s)),
-    );
+  const handleFavoriteToggle = (id: string) => {
+    void toggleFavorite(id, "/search");
   };
 
 
@@ -772,7 +688,7 @@ function SearchPage() {
                           className="animate-card-flow"
                           style={{ animationDelay: `${80 + Math.min(idx, 6) * 20}ms` }}
                         >
-                          <SongCard song={song} onFavorite={toggleFavorite} />
+                          <SongCard song={song} onFavorite={handleFavoriteToggle} />
                         </div>
                       ))}
                     </div>
@@ -794,7 +710,7 @@ function SearchPage() {
                           className="animate-card-flow"
                           style={{ animationDelay: `${100 + Math.min(idx, 6) * 20}ms` }}
                         >
-                          <SongCard song={song} onFavorite={toggleFavorite} />
+                          <SongCard song={song} onFavorite={handleFavoriteToggle} />
                         </div>
                       ))}
                     </div>
@@ -839,7 +755,7 @@ function SearchPage() {
                         className="animate-card-flow"
                         style={{ animationDelay: `${140 + Math.min(idx, 8) * 20}ms` }}
                       >
-                        <SongCard song={song} onFavorite={toggleFavorite} />
+                        <SongCard song={song} onFavorite={handleFavoriteToggle} />
                       </div>
                     ))}
                   </div>

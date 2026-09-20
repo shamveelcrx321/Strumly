@@ -20,6 +20,7 @@ import { Navbar } from "@/components/Navbar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth-context";
+import { useFavorites } from "@/lib/favorites-context";
 import studioImage from "@/assets/strumly-studio.jpg";
 import { songService } from "@/services/song-service";
 import type { SongDetail, SongSummary } from "@/services/song-types";
@@ -67,31 +68,13 @@ function SongDetailPage() {
   const [transposeSteps, setTransposeSteps] = useState(0);
   const [simplified, setSimplified] = useState(false);
   const [fontSizeIndex, setFontSizeIndex] = useState(1); // 0: small, 1: medium, 2: large
-  const [isFavorited, setIsFavorited] = useState(false);
   const [activeChord, setActiveChord] = useState<string>("");
 
-  const { isAuthenticated } = useAuth();
+  const { isFavorite, toggleFavorite } = useFavorites();
+  const isFavorited = isFavorite(song?.id || id);
 
   const handleToggleFavorite = () => {
-    if (!isAuthenticated) {
-      toast.info("Please sign in to save songs to your favorites.", {
-        action: {
-          label: "Sign In",
-          onClick: () => {
-            void navigate({ to: "/login", search: { redirect: `/song/${id}` } });
-          },
-        },
-      });
-      return;
-    }
-
-    const next = !isFavorited;
-    setIsFavorited(next);
-    if (next) {
-      toast.success("Saved to favorites!");
-    } else {
-      toast.info("Removed from favorites.");
-    }
+    void toggleFavorite(song?.id || id, `/song/${id}`);
   };
 
   // Auto-scroll state
