@@ -1,12 +1,8 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useRef, useState } from "react";
 import {
   ArrowRight,
   BarChart3,
-  Bell,
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
   Flower2,
   Guitar,
   Heart,
@@ -20,7 +16,7 @@ import {
   Zap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { AccountDropdown } from "@/components/AccountDropdown";
+import { Navbar } from "@/components/Navbar";
 import { stats, suggestedSearches, musicQuotes } from "@/services/catalog";
 import studioImage from "@/assets/strumly-studio.jpg";
 import popImage from "@/assets/genre-pop.jpg";
@@ -76,10 +72,6 @@ function StrumlyHome() {
     void navigate({ to: "/search", search: { q: cleaned } });
   };
 
-  const scrollGenres = (direction: number) => {
-    railRef.current?.scrollBy({ left: direction * 430, behavior: "smooth" });
-  };
-
   return (
     <main className="min-h-screen overflow-hidden bg-background text-foreground">
       <section className="relative isolate min-h-screen overflow-hidden pb-5 lg:min-h-screen lg:pb-0">
@@ -87,19 +79,7 @@ function StrumlyHome() {
         <div className="hero-vignette absolute inset-0 -z-20" />
         <div className="bottom-shade absolute inset-x-0 bottom-0 -z-10 h-[45%]" />
 
-        <header className="relative z-30 mx-auto grid h-20 max-w-[1440px] grid-cols-[minmax(0,1fr)_auto] items-center gap-5 px-5 sm:flex sm:px-8 lg:px-12 animate-flow-1">
-          <a href="#" className="flex min-w-0 items-center gap-3" aria-label="Strumly home">
-            <span className="grid size-10 shrink-0 rotate-[-8deg] place-items-center rounded-[42%_42%_52%_52%] bg-primary text-primary-foreground shadow-warm"><Guitar size={20} /></span>
-            <span className="truncate font-display text-2xl font-extrabold">Strumly</span>
-          </a>
-          <nav className="ml-7 hidden items-center gap-1 lg:flex" aria-label="Primary navigation">
-            {['Explore','Top Charts','Upload','My Music'].map((item) => <a key={item} href={item === 'Explore' ? '/search' : item === 'Upload' ? '/upload' : item === 'My Music' ? '/login' : `#${item.toLowerCase().replace(' ','-')}`} className="rounded-xl px-4 py-2.5 text-sm font-medium transition text-foreground/75 hover:text-foreground">{item}</a>)}
-          </nav>
-          <div className="ml-auto flex shrink-0 items-center gap-2 sm:gap-3">
-            <Button variant="ghost" size="icon" aria-label="Notifications" className="relative"><Bell /><span className="absolute right-2 top-2 size-2 rounded-full bg-primary" /></Button>
-            <AccountDropdown />
-          </div>
-        </header>
+        <Navbar activeItem="Home" />
 
         <div className="relative z-10 mx-auto max-w-[1440px] px-5 pt-12 sm:px-8 lg:px-12 lg:pt-9">
           <div className="max-w-[770px]">
@@ -132,11 +112,32 @@ function StrumlyHome() {
             <h2 className="mr-2 text-lg font-bold">Explore by Genre</h2>
           </div>
           <div ref={railRef} className="no-scrollbar flex snap-x gap-3 overflow-x-auto pb-2">
-            {genres.map(({ name, image, Icon }) => <button key={name} className="group relative h-[102px] w-[148px] shrink-0 snap-start overflow-hidden rounded-xl border border-glass-border text-left shadow-xl transition duration-300 hover:-translate-y-1 hover:border-primary/70">
-              <img src={image} alt="" loading="lazy" width={480} height={480} className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-110" />
-              <span className="absolute inset-0 bg-gradient-to-t from-background/90 via-background/10 to-transparent" />
-              <span className="absolute inset-x-3 bottom-3 flex items-center gap-2 text-sm font-semibold text-cream"><Icon size={17} />{name}</span>
-            </button>)}
+            {genres.map(({ name, image, Icon }) => {
+              const isGenreFilter = name !== "Trending";
+              const target = isGenreFilter
+                ? `/search?genre=${encodeURIComponent(name)}`
+                : "/search";
+              return (
+                <a
+                  key={name}
+                  href={target}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    void navigate(
+                      isGenreFilter
+                        ? { to: "/search", search: { q: "", genre: name } }
+                        : { to: "/search", search: { q: "", genre: "" } },
+                    );
+                  }}
+                  className="group relative h-[102px] w-[148px] shrink-0 snap-start overflow-hidden rounded-xl border border-glass-border text-left shadow-xl transition duration-300 hover:-translate-y-1 hover:border-primary/70"
+                  aria-label={`Explore ${name} songs`}
+                >
+                  <img src={image} alt="" loading="lazy" width={480} height={480} className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-110" />
+                  <span className="absolute inset-0 bg-gradient-to-t from-background/90 via-background/10 to-transparent" />
+                  <span className="absolute inset-x-3 bottom-3 flex items-center gap-2 text-sm font-semibold text-cream"><Icon size={17} />{name}</span>
+                </a>
+              );
+            })}
           </div>
           <div className="mt-3 grid items-end gap-5 lg:grid-cols-[1fr_auto]">
             <blockquote className="flex max-w-md gap-3 text-cream/80">

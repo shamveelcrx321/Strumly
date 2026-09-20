@@ -1,8 +1,9 @@
 import * as React from "react";
-import { Link, useNavigate } from "@tanstack/react-router";
-import { Bell, Guitar, Search } from "lucide-react";
+import { Link, useLocation, useNavigate } from "@tanstack/react-router";
+import { Guitar, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AccountDropdown } from "./AccountDropdown";
+import { NotificationDropdown } from "./NotificationDropdown";
 import { useAuth } from "@/lib/auth-context";
 
 export interface NavbarProps {
@@ -18,7 +19,17 @@ export function Navbar({
 }: NavbarProps) {
   const [navSearch, setNavSearch] = React.useState("");
   const navigate = useNavigate();
+  const location = useLocation();
   const { isAuthenticated } = useAuth();
+
+  // Hide search on Home and Explore pages where dedicated primary search exists
+  const isSearchHiddenPage =
+    activeItem === "Home" ||
+    activeItem === "Explore" ||
+    location.pathname === "/" ||
+    location.pathname === "/search";
+
+  const shouldShowSearch = showSearch && !isSearchHiddenPage;
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,7 +40,7 @@ export function Navbar({
 
   const navLinks = [
     { label: "Explore", to: "/search" },
-    { label: "Top Charts", to: "/#top-charts" },
+    { label: "Top Charts", to: "/top-charts" },
     {
       label: "Upload",
       to: isAuthenticated ? "/upload" : "/login",
@@ -82,7 +93,7 @@ export function Navbar({
       {/* ── Right Actions ── */}
       <div className="ml-auto flex shrink-0 items-center gap-2 sm:gap-3">
         {/* Quick Search Pill */}
-        {showSearch && (
+        {shouldShowSearch && (
           <form onSubmit={handleSearchSubmit} className="relative hidden md:block">
             <Search
               className="absolute left-3.5 top-1/2 -translate-y-1/2 text-cream/50 pointer-events-none"
@@ -99,16 +110,8 @@ export function Navbar({
           </form>
         )}
 
-        {/* Notifications Bell */}
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label="Notifications"
-          className="relative text-cream/80 hover:text-cream hover:bg-glass/50"
-        >
-          <Bell size={18} />
-          <span className="absolute right-2 top-2 size-2 rounded-full bg-primary" />
-        </Button>
+        {/* Notifications Bell & Dropdown */}
+        <NotificationDropdown />
 
         {/* Profile Dropdown Menu */}
         <AccountDropdown />

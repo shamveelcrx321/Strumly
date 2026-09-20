@@ -15,6 +15,7 @@ import { Route as MyMusicRouteImport } from './routes/my-music'
 import { Route as SearchRouteImport } from './routes/search'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as SignupRouteImport } from './routes/signup'
+import { Route as TopChartsRouteImport } from './routes/top-charts'
 import { Route as UploadRouteImport } from './routes/upload'
 import { Route as SongIdRouteImport } from './routes/song.$id'
 
@@ -48,6 +49,11 @@ const SignupRoute = SignupRouteImport.update({
   path: '/signup',
   getParentRoute: () => rootRouteImport,
 } as any)
+const TopChartsRoute = TopChartsRouteImport.update({
+  id: '/top-charts',
+  path: '/top-charts',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const UploadRoute = UploadRouteImport.update({
   id: '/upload',
   path: '/upload',
@@ -66,6 +72,7 @@ export interface FileRoutesByFullPath {
   '/search': typeof SearchRoute
   '/settings': typeof SettingsRoute
   '/signup': typeof SignupRoute
+  '/top-charts': typeof TopChartsRoute
   '/upload': typeof UploadRoute
   '/song/$id': typeof SongIdRoute
 }
@@ -76,6 +83,7 @@ export interface FileRoutesByTo {
   '/search': typeof SearchRoute
   '/settings': typeof SettingsRoute
   '/signup': typeof SignupRoute
+  '/top-charts': typeof TopChartsRoute
   '/upload': typeof UploadRoute
   '/song/$id': typeof SongIdRoute
 }
@@ -87,6 +95,7 @@ export interface FileRoutesById {
   '/search': typeof SearchRoute
   '/settings': typeof SettingsRoute
   '/signup': typeof SignupRoute
+  '/top-charts': typeof TopChartsRoute
   '/upload': typeof UploadRoute
   '/song/$id': typeof SongIdRoute
 }
@@ -99,6 +108,7 @@ export interface FileRouteTypes {
     | '/search'
     | '/settings'
     | '/signup'
+    | '/top-charts'
     | '/upload'
     | '/song/$id'
   fileRoutesByTo: FileRoutesByTo
@@ -109,6 +119,7 @@ export interface FileRouteTypes {
     | '/search'
     | '/settings'
     | '/signup'
+    | '/top-charts'
     | '/upload'
     | '/song/$id'
   id:
@@ -119,6 +130,7 @@ export interface FileRouteTypes {
     | '/search'
     | '/settings'
     | '/signup'
+    | '/top-charts'
     | '/upload'
     | '/song/$id'
   fileRoutesById: FileRoutesById
@@ -130,6 +142,7 @@ export interface RootRouteChildren {
   SearchRoute: typeof SearchRoute
   SettingsRoute: typeof SettingsRoute
   SignupRoute: typeof SignupRoute
+  TopChartsRoute: typeof TopChartsRoute
   UploadRoute: typeof UploadRoute
   SongIdRoute: typeof SongIdRoute
 }
@@ -178,6 +191,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SignupRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/top-charts': {
+      id: '/top-charts'
+      path: '/top-charts'
+      fullPath: '/top-charts'
+      preLoaderRoute: typeof TopChartsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/upload': {
       id: '/upload'
       path: '/upload'
@@ -202,6 +222,7 @@ const rootRouteChildren: RootRouteChildren = {
   SearchRoute: SearchRoute,
   SettingsRoute: SettingsRoute,
   SignupRoute: SignupRoute,
+  TopChartsRoute: TopChartsRoute,
   UploadRoute: UploadRoute,
   SongIdRoute: SongIdRoute,
 }

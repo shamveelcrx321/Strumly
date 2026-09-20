@@ -2,7 +2,6 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import {
   ArrowRight,
-  Bell,
   ChevronDown,
   Guitar,
   Heart,
@@ -16,7 +15,7 @@ import {
 } from "lucide-react";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
-import { AccountDropdown } from "@/components/AccountDropdown";
+import { Navbar } from "@/components/Navbar";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Select,
@@ -40,8 +39,20 @@ import studioImage from "@/assets/strumly-studio.jpg";
 
 // ─── Route ────────────────────────────────────────────────────────────────────
 
+const VALID_GENRES = [
+  "Pop", "Rock", "Acoustic", "Indie", "Classical",
+  "Anime", "Malayalam", "Bollywood", "R&B", "Alternative",
+] as const;
+
 const searchParamsSchema = z.object({
   q: z.string().optional().default(""),
+  genre: z
+    .string()
+    .optional()
+    .transform((val) =>
+      val && VALID_GENRES.includes(val as (typeof VALID_GENRES)[number]) ? val : "",
+    )
+    .default(""),
 });
 
 export const Route = createFileRoute("/search")({
@@ -113,40 +124,6 @@ const POPULAR_IDS = [
   "faint",
 ];
 
-// ─── Shared Navbar ────────────────────────────────────────────────────────────
-
-function NavBar() {
-  return (
-    <header className="relative z-30 mx-auto grid h-20 max-w-[1440px] grid-cols-[minmax(0,1fr)_auto] items-center gap-5 px-5 sm:flex sm:px-8 lg:px-12">
-      <Link to="/" className="flex min-w-0 items-center gap-3" aria-label="Strumly home">
-        <span className="grid size-10 shrink-0 rotate-[-8deg] place-items-center rounded-[42%_42%_52%_52%] bg-primary text-primary-foreground shadow-warm">
-          <Guitar size={20} />
-        </span>
-        <div className="min-w-0">
-          <span className="block truncate font-display text-2xl font-extrabold leading-none">Strumly</span>
-        </div>
-      </Link>
-      <nav className="ml-7 hidden items-center gap-1 lg:flex" aria-label="Primary navigation">
-        {["Explore", "Top Charts", "Upload", "My Music"].map((item, i) => (
-          <a
-            key={item}
-            href={item === "Explore" ? "/search" : item === "Upload" ? "/upload" : item === "My Music" ? "/login" : `/#${item.toLowerCase().replace(" ", "-")}`}
-            className={`rounded-xl px-4 py-2.5 text-sm font-medium transition ${i === 0 ? "border border-glass-border bg-glass text-foreground backdrop-blur-md" : "text-foreground/75 hover:text-foreground"}`}
-          >
-            {item}
-          </a>
-        ))}
-      </nav>
-      <div className="ml-auto flex shrink-0 items-center gap-2 sm:gap-3">
-        <Button variant="ghost" size="icon" aria-label="Notifications" className="relative">
-          <Bell />
-          <span className="absolute right-2 top-2 size-2 rounded-full bg-primary" />
-        </Button>
-        <AccountDropdown />
-      </div>
-    </header>
-  );
-}
 
 // ─── Custom Glassmorphism Dropdowns ───────────────────────────────────────────
 
@@ -511,12 +488,15 @@ function MobileFilterBar({
 const DEFAULT_FILTERS: SearchFilters = { genre: "", difficulty: "", key: "", capo: "" };
 
 function SearchPage() {
-  const { q: initialQ } = Route.useSearch();
+  const { q: initialQ, genre: initialGenre } = Route.useSearch();
   const navigate = useNavigate({ from: "/search" });
 
   const [inputValue, setInputValue] = useState(initialQ);
   const [query, setQuery] = useState(initialQ);
-  const [filters, setFilters] = useState<SearchFilters>(DEFAULT_FILTERS);
+  const [filters, setFilters] = useState<SearchFilters>({
+    ...DEFAULT_FILTERS,
+    genre: (initialGenre as Genre) || "",
+  });
   const [sort, setSort] = useState<SortOption>("relevance");
   const [activeTab, setActiveTab] = useState<ContentTab>("All");
   const [isLoading, setIsLoading] = useState(false);
@@ -583,31 +563,42 @@ function SearchPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query, filters, sort]);
 
-  // Sync URL → state
+  // Sync URL search query → state
   useEffect(() => {
     setInputValue(initialQ);
     setQuery(initialQ);
   }, [initialQ]);
 
+  // Sync URL genre param → filter state
+  useEffect(() => {
+    setFilters((prev) => ({ ...prev, genre: (initialGenre as Genre) || "" }));
+  }, [initialGenre]);
+
   const handleSearch = () => {
     const cleaned = inputValue.trim();
     setQuery(cleaned);
-    void navigate({ search: { q: cleaned } });
+    void navigate({ search: (prev) => ({ ...prev, q: cleaned }) });
   };
 
   const handleClear = () => {
     setInputValue("");
     setQuery("");
     setFilters(DEFAULT_FILTERS);
-    void navigate({ search: { q: "" } });
+    void navigate({ search: { q: "", genre: "" } });
     inputRef.current?.focus();
   };
 
   const handleFilterChange = (key: keyof SearchFilters, value: string) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
+    if (key === "genre") {
+      void navigate({ search: (prev) => ({ ...prev, genre: value }) });
+    }
   };
 
-  const clearFilters = () => setFilters(DEFAULT_FILTERS);
+  const clearFilters = () => {
+    setFilters(DEFAULT_FILTERS);
+    void navigate({ search: (prev) => ({ ...prev, genre: "" }) });
+  };
 
   const toggleFavorite = (id: string) => {
     setFavorites((prev) => {
@@ -628,7 +619,7 @@ function SearchPage() {
   const handleSuggest = (s: string) => {
     setInputValue(s);
     setQuery(s);
-    void navigate({ search: { q: s } });
+    void navigate({ search: (prev) => ({ ...prev, q: s }) });
   };
 
   const hasActiveFilters = !!(filters.genre || filters.difficulty || filters.key || filters.capo);
@@ -652,8 +643,8 @@ function SearchPage() {
       </div>
 
       {/* ── Fixed Navbar ── */}
-      <div className="relative z-10 shrink-0 animate-flow-1">
-        <NavBar />
+      <div className="relative z-10 shrink-0">
+        <Navbar activeItem="Explore" />
       </div>
 
       {/* ── Workspace Container ── */}

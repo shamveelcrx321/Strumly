@@ -2,7 +2,6 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState, useCallback } from "react";
 import {
   ArrowLeft,
-  Bell,
   ChevronDown,
   Guitar,
   Heart,
@@ -17,7 +16,7 @@ import {
   Volume2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { AccountDropdown } from "@/components/AccountDropdown";
+import { Navbar } from "@/components/Navbar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth-context";
@@ -52,52 +51,6 @@ const DIFFICULTY_STYLES = {
   Advanced: "bg-rose-900/50 text-rose-300 border-rose-700/30",
 };
 
-// ─── Reusable Strumly Navbar ──────────────────────────────────────────────────
-
-function NavBar() {
-  return (
-    <header className="relative z-30 mx-auto grid h-20 max-w-[1440px] grid-cols-[minmax(0,1fr)_auto] items-center gap-5 px-5 sm:flex sm:px-8 lg:px-12 animate-flow-1">
-      <Link to="/" className="flex min-w-0 items-center gap-3" aria-label="Strumly home">
-        <span className="grid size-10 shrink-0 rotate-[-8deg] place-items-center rounded-[42%_42%_52%_52%] bg-primary text-primary-foreground shadow-warm">
-          <Guitar size={20} />
-        </span>
-        <div className="min-w-0">
-          <span className="block truncate font-display text-2xl font-extrabold leading-none text-cream">
-            Strumly
-          </span>
-        </div>
-      </Link>
-      <nav className="ml-7 hidden items-center gap-1 lg:flex" aria-label="Primary navigation">
-        {[
-          { label: "Explore", href: "/search", active: true },
-          { label: "Top Charts", href: "/#top-charts" },
-          { label: "Upload", href: "/upload" },
-          { label: "My Music", href: "/login" },
-          { label: "Community", href: "/#community" },
-        ].map((item) => (
-          <Link
-            key={item.label}
-            to={item.href}
-            className={`rounded-xl px-4 py-2.5 text-sm font-medium transition ${
-              item.active
-                ? "border border-glass-border bg-glass text-foreground backdrop-blur-md"
-                : "text-foreground/75 hover:text-foreground"
-            }`}
-          >
-            {item.label}
-          </Link>
-        ))}
-      </nav>
-      <div className="ml-auto flex shrink-0 items-center gap-2 sm:gap-3">
-        <Button variant="ghost" size="icon" aria-label="Notifications" className="relative">
-          <Bell />
-          <span className="absolute right-2 top-2 size-2 rounded-full bg-primary" />
-        </Button>
-        <AccountDropdown />
-      </div>
-    </header>
-  );
-}
 
 // ─── Main Song Detail Page Component ──────────────────────────────────────────
 
@@ -275,8 +228,8 @@ function SongDetailPage() {
         <div className="absolute inset-0 bg-black/45 bg-gradient-to-b from-black/40 via-black/25 to-black/60" />
       </div>
 
-      {/* ── Fixed Navbar ── */}
-      <NavBar />
+      {/* ── Shared Navbar ── */}
+      <Navbar />
 
       {/* ── Page Content (SCROLLS NATURALLY) ── */}
       <main className="relative z-10 mx-auto max-w-[1440px] px-5 sm:px-8 lg:px-12 pb-20 pt-3">

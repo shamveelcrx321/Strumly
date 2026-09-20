@@ -31,6 +31,7 @@ interface AccountDropdownProps {
   userName?: string;
   userEmail?: string;
   avatarInitials?: string;
+  avatarUrl?: string;
   className?: string;
 }
 
@@ -39,20 +40,45 @@ export function AccountDropdown({
   userName,
   userEmail,
   avatarInitials,
+  avatarUrl: avatarUrlProp,
   className = "",
 }: AccountDropdownProps) {
   const { user, isAuthenticated, signOut } = useAuth();
   const navigate = useNavigate();
 
+  const [imageError, setImageError] = React.useState(false);
+
   const effectiveLoggedIn = isLoggedIn !== undefined ? isLoggedIn : isAuthenticated;
 
   const rawName =
     userName ||
-    (user?.user_metadata?.full_name as string) ||
+    (user?.user_metadata?.["full_name"] as string) ||
+    (user?.user_metadata?.["name"] as string) ||
     (user?.email ? user.email.split("@")[0] : undefined) ||
     "Musician";
 
   const displayEmail = userEmail || user?.email || undefined;
+
+  // Avatar URL priority:
+  // 1. Explicit avatarUrl prop
+  // 2. user.user_metadata.avatar_url (Supabase / Google OAuth standard)
+  // 3. user.user_metadata.picture (OAuth fallback)
+  const resolvedAvatarUrl = React.useMemo(() => {
+    if (imageError) return undefined;
+    if (avatarUrlProp) return avatarUrlProp;
+    const meta = user?.user_metadata;
+    if (meta?.["avatar_url"] && typeof meta["avatar_url"] === "string") {
+      return meta["avatar_url"];
+    }
+    if (meta?.["picture"] && typeof meta["picture"] === "string") {
+      return meta["picture"];
+    }
+    return undefined;
+  }, [avatarUrlProp, user?.user_metadata, imageError]);
+
+  React.useEffect(() => {
+    setImageError(false);
+  }, [user?.id, avatarUrlProp]);
 
   // Generate 2-letter initials from name or email
   const computedInitials = React.useMemo(() => {
@@ -79,7 +105,17 @@ export function AccountDropdown({
           aria-label="Open profile menu"
         >
           <span className="grid size-9 shrink-0 place-items-center overflow-hidden rounded-full border border-glass-border bg-primary text-xs font-bold text-primary-foreground shadow-sm transition group-hover:scale-105 group-hover:border-primary/80">
-            {computedInitials}
+            {resolvedAvatarUrl ? (
+              <img
+                src={resolvedAvatarUrl}
+                alt={rawName}
+                onError={() => setImageError(true)}
+                className="h-full w-full object-cover"
+                referrerPolicy="no-referrer"
+              />
+            ) : (
+              computedInitials
+            )}
           </span>
           <ChevronDown
             size={15}
@@ -96,11 +132,25 @@ export function AccountDropdown({
         {effectiveLoggedIn ? (
           <>
             {/* ── Logged In Header ── */}
-            <div className="border-b border-glass-border/40 px-3 py-2.5">
-              <p className="truncate text-sm font-bold text-cream">{rawName}</p>
-              {displayEmail && (
-                <p className="truncate text-xs text-cream/60">{displayEmail}</p>
-              )}
+            <div className="flex items-center gap-3 border-b border-glass-border/40 px-3 py-2.5">
+              <span className="grid size-8 shrink-0 place-items-center overflow-hidden rounded-full border border-glass-border bg-primary text-xs font-bold text-primary-foreground shadow-sm">
+                {resolvedAvatarUrl ? (
+                  <img
+                    src={resolvedAvatarUrl}
+                    alt={rawName}
+                    className="h-full w-full object-cover"
+                    referrerPolicy="no-referrer"
+                  />
+                ) : (
+                  computedInitials
+                )}
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-bold text-cream">{rawName}</p>
+                {displayEmail && (
+                  <p className="truncate text-xs text-cream/60">{displayEmail}</p>
+                )}
+              </div>
             </div>
 
             <div className="py-1">
