@@ -59,7 +59,8 @@ export interface SongService {
   getSong(id: string): Promise<SongDetail | null>;
   getRelatedSongs(currentSong: SongDetail, limit?: number): Promise<SongSummary[]>;
   getAllSongs(): Promise<SongSummary[]>;
-  createSong(input: CreateSongInput): Promise<string>;
+  createSong(input: CreateSongInput): Promise<SongDetail>;
+  getUserUploadedSongs(userId?: string): Promise<Song[]>;
   resolveSongUuid(songIdOrSlug: string): Promise<string | null>;
   getFavorites(): Promise<FavoriteRecord[]>;
   getFavoriteSongs(): Promise<Song[]>;
@@ -69,70 +70,13 @@ export interface SongService {
   removeFavorite(songIdOrSlug: string): Promise<boolean>;
   toggleFavorite(songIdOrSlug: string): Promise<boolean>;
 }
-
-function parseLyricsIntoSections(lyricsText: string): {
-  sections: SongDetail["sections"];
-  chords: string[];
-} {
-  const lines = lyricsText.split("\n");
-  const sections: SongDetail["sections"] = [];
-  const foundChords = new Set<string>();
-
-  let currentSectionName = "Lyrics";
-  let currentLines: SongDetail["sections"][0]["lines"] = [];
-
-  for (const rawLine of lines) {
-    const trimmed = rawLine.trim();
-
-    // Check if line is a section heading like [Verse 1] or [Chorus]
-    const headingMatch = trimmed.match(/^\[([a-zA-Z0-9\s-_]+)\]$/);
-    if (headingMatch) {
-      if (currentLines.length > 0) {
-        sections.push({ name: currentSectionName, lines: currentLines });
-        currentLines = [];
-      }
-      currentSectionName = headingMatch[1] || "Section";
-      continue;
-    }
-
-    if (!trimmed) {
-      continue;
-    }
-
-    // Check for inline bracketed chords like [C] or [Am]
-    const lineChords: string[] = [];
-    const chordMatches = trimmed.match(/\[([A-G][#b]?[a-zA-Z0-9/]*)\]/g);
-    if (chordMatches) {
-      for (const m of chordMatches) {
-        const chordName = m.slice(1, -1);
-        lineChords.push(chordName);
-        foundChords.add(chordName);
-      }
-    }
-
-    // Clean text by removing the inline chord markers for clean lyric rendering
-    const cleanText = trimmed
-      .replace(/\[([A-G][#b]?[a-zA-Z0-9/]*)\]\s*/g, "")
-      .trim();
-
-    currentLines.push({
-      text: cleanText || trimmed,
-      chords: lineChords.length > 0 ? lineChords : undefined,
-    });
-  }
-
-  if (currentLines.length > 0 || sections.length === 0) {
-    sections.push({
-      name: currentSectionName,
-      lines:
-        currentLines.length > 0
-          ? currentLines
-          : [{ text: lyricsText.trim() }],
-    });
-  }
-
-  return { sections, chords: Array.from(foundChords) };
-}
+import { parseLyricsIntoSections } from "@/lib/chord-parser";
+export {
+  parseLyricsIntoSections,
+  isChordToken,
+  isChordLine,
+  parseSectionHeading,
+} from "@/lib/chord-parser";
 
 interface DatabaseSongRow {
   id: string;
@@ -155,6 +99,7 @@ interface DatabaseSongRow {
   sections?: unknown;
   lyrics?: string | null;
   author?: string | null;
+  uploaded_by?: string | null;
 }
 
 interface FavoriteQueryRow {
@@ -163,6 +108,76 @@ interface FavoriteQueryRow {
   song_id: string;
   created_at: string;
   songs?: DatabaseSongRow | null;
+}
+
+export function mapDatabaseRowToSongDetail(
+  data: DatabaseSongRow,
+  fallbackId?: string
+): SongDetail {
+  // 1. Sections priority: Supabase data.sections -> parseLyricsIntoSections fallback -> empty []
+  let sections: SongDetail["sections"] = [];
+  if (Array.isArray(data.sections) && data.sections.length > 0) {
+    sections = data.sections.map((sec: any) => ({
+      name: typeof sec?.name === "string" ? sec.name : "Section",
+      lines: Array.isArray(sec?.lines)
+        ? sec.lines.map((line: any) => ({
+            text: typeof line?.text === "string" ? line.text : "",
+            chords: Array.isArray(line?.chords) ? line.chords : undefined,
+          }))
+        : [],
+    }));
+  } else if (
+    data.lyrics &&
+    typeof data.lyrics === "string" &&
+    data.lyrics.trim().length > 0
+  ) {
+    const parsed = parseLyricsIntoSections(data.lyrics);
+    sections = parsed.sections;
+  }
+
+  // 2. Chords priority: Supabase data.chords -> derived from sections -> empty []
+  let chords: string[] = [];
+  if (Array.isArray(data.chords) && data.chords.length > 0) {
+    chords = data.chords.filter((c: any) => typeof c === "string" && c.trim().length > 0);
+  } else if (sections.length > 0) {
+    const derived = new Set<string>();
+    for (const sec of sections) {
+      for (const line of sec.lines || []) {
+        for (const ch of line.chords || []) {
+          if (ch && typeof ch === "string") derived.add(ch);
+        }
+      }
+    }
+    chords = Array.from(derived);
+  }
+
+  const songDetail: SongDetail = {
+    id: data.slug || data.id || fallbackId || "",
+    title: data.title ?? "",
+    artist: data.artist ?? "",
+    genre: (data.genre as Genre) || "Pop",
+    difficulty:
+      (data.difficulty as "Beginner" | "Intermediate" | "Advanced") ||
+      "Intermediate",
+    key: data.song_key ?? "C",
+    capo: typeof data.capo === "number" ? data.capo : 0,
+    tuning: data.tuning ?? "Standard",
+    artColor:
+      data.art_color ||
+      "from-stone-700 to-amber-900",
+    chordCount:
+      typeof data.chord_count === "number"
+        ? data.chord_count
+        : chords.length || 0,
+    chords,
+    sections,
+    ...(data.author && data.author.trim() ? { author: data.author.trim() } : {}),
+    ...(data.album && data.album.trim() ? { album: data.album.trim() } : {}),
+    ...(typeof data.duration === "string" && data.duration.trim() ? { duration: data.duration.trim() } : {}),
+    ...(typeof data.popularity === "number" ? { popularity: data.popularity } : {}),
+  };
+
+  return songDetail;
 }
 
 class SupabaseSongService implements SongService {
@@ -291,85 +306,7 @@ class SupabaseSongService implements SongService {
       }
 
       if (data) {
-        // 1. Sections priority: Supabase data.sections -> parseLyricsIntoSections fallback -> empty []
-        let sections: SongDetail["sections"] = [];
-        if (Array.isArray(data.sections) && data.sections.length > 0) {
-          sections = data.sections.map((sec: any) => ({
-            name: typeof sec?.name === "string" ? sec.name : "Section",
-            lines: Array.isArray(sec?.lines)
-              ? sec.lines.map((line: any) => ({
-                  text: typeof line?.text === "string" ? line.text : "",
-                  chords: Array.isArray(line?.chords) ? line.chords : undefined,
-                }))
-              : [],
-          }));
-        } else if (
-          data.lyrics &&
-          typeof data.lyrics === "string" &&
-          data.lyrics.trim().length > 0
-        ) {
-          const parsed = parseLyricsIntoSections(data.lyrics);
-          sections = parsed.sections;
-        }
-
-        // 2. Chords priority: Supabase data.chords -> derived from sections -> empty []
-        let chords: string[] = [];
-        if (Array.isArray(data.chords) && data.chords.length > 0) {
-          chords = data.chords.filter((c: any) => typeof c === "string" && c.trim().length > 0);
-        } else if (sections.length > 0) {
-          const derived = new Set<string>();
-          for (const sec of sections) {
-            for (const line of sec.lines || []) {
-              for (const ch of line.chords || []) {
-                if (ch && typeof ch === "string") derived.add(ch);
-              }
-            }
-          }
-          chords = Array.from(derived);
-        }
-
-        // 3. Duration: Supabase data.duration -> undefined
-        const duration =
-          (typeof data.duration === "string" && data.duration.trim()) ||
-          undefined;
-
-        const songDetail: SongDetail = {
-          id: data.slug || data.id || normalized,
-          title: data.title ?? "",
-          artist: data.artist ?? "",
-          author:
-            (data.author && data.author.trim()) ||
-            undefined,
-          album:
-            (data.album && data.album.trim()) ||
-            undefined,
-          genre: (data.genre as Genre) || "Pop",
-          difficulty:
-            (data.difficulty as "Beginner" | "Intermediate" | "Advanced") ||
-            "Intermediate",
-          key: data.song_key ?? "C",
-          capo:
-            typeof data.capo === "number"
-              ? data.capo
-              : 0,
-          tuning: data.tuning ?? "Standard",
-          duration,
-          popularity:
-            typeof data.popularity === "number"
-              ? data.popularity
-              : undefined,
-          artColor:
-            data.art_color ||
-            "from-stone-700 to-amber-900",
-          chordCount:
-            typeof data.chord_count === "number"
-              ? data.chord_count
-              : chords.length || 0,
-          chords,
-          sections,
-        };
-
-        return songDetail;
+        return mapDatabaseRowToSongDetail(data, normalized);
       }
     } catch (err) {
       console.warn("Error retrieving song from Supabase:", err);
@@ -417,21 +354,8 @@ class SupabaseSongService implements SongService {
 
   async getAllSongs(): Promise<SongSummary[]> {
     const databaseSongs = await this.getSongs();
-    const stored = songStorage.getStoredSongs();
 
-    const storedSummaries: SongSummary[] = stored.map((s) => ({
-      id: s.id,
-      title: s.title,
-      artist: s.artist,
-      genre: s.genre,
-      key: s.key,
-      capo: s.capo,
-      difficulty: s.difficulty,
-      chordCount: s.chords.length,
-      artColor: s.artColor || "from-stone-700 to-amber-900",
-    }));
-
-    const dbSummaries: SongSummary[] = databaseSongs.map((s) => ({
+    return databaseSongs.map((s) => ({
       id: s.id,
       title: s.title,
       artist: s.artist,
@@ -442,53 +366,161 @@ class SupabaseSongService implements SongService {
       chordCount: s.chordCount,
       artColor: s.artColor || "from-stone-700 to-amber-900",
     }));
-
-    const seen = new Set<string>();
-    const combined: SongSummary[] = [];
-    for (const item of [...storedSummaries, ...dbSummaries]) {
-      if (!seen.has(item.id)) {
-        seen.add(item.id);
-        combined.push(item);
-      }
-    }
-    return combined;
   }
 
-  async createSong(input: CreateSongInput): Promise<string> {
+  async createSong(input: CreateSongInput): Promise<SongDetail> {
+    // 1. Validate input
+    if (!input.title || !input.title.trim()) {
+      throw new Error("Song title is required.");
+    }
+    if (!input.artist || !input.artist.trim()) {
+      throw new Error("Artist is required.");
+    }
+    if (!input.lyricsText || !input.lyricsText.trim()) {
+      throw new Error("Lyrics are required.");
+    }
+
+    // 2. Authentication check
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+
+    if (userError || !user) {
+      throw new Error("You must be authenticated to upload a song.");
+    }
+
+    // 3. Parse lyrics into sections and chords
+    const { sections, chords } = parseLyricsIntoSections(input.lyricsText);
+
+    // 4. Generate unique slug
     const rawSlug = `${input.title}-${input.artist}`
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-+|-+$/g, "");
 
-    // Ensure unique slug
-    const existing = await this.getAllSongs();
-    let finalId = rawSlug || `song-${Date.now()}`;
-    if (existing.some((s) => s.id === finalId)) {
-      finalId = `${finalId}-${Math.floor(Math.random() * 1000)}`;
+    let finalSlug = rawSlug || `song-${Date.now()}`;
+
+    // Verify uniqueness against existing database rows
+    try {
+      const { data: existingRow } = await supabase
+        .from("songs")
+        .select("id")
+        .eq("slug", finalSlug)
+        .maybeSingle();
+
+      if (existingRow) {
+        finalSlug = `${finalSlug}-${Math.floor(1000 + Math.random() * 9000)}`;
+      }
+    } catch {
+      finalSlug = `${finalSlug}-${Date.now().toString().slice(-4)}`;
     }
 
-    const { sections, chords } = parseLyricsIntoSections(input.lyricsText);
-
-    const newSong: SongDetail = {
-      id: finalId,
+    // 5. Map data to public.songs database schema including user ownership (uploaded_by)
+    const songData = {
+      slug: finalSlug,
       title: input.title.trim(),
       artist: input.artist.trim(),
-      author: input.author.trim(),
+      author: input.author && input.author.trim() ? input.author.trim() : null,
+      uploaded_by: user.id,
       genre: input.genre || "Pop",
       difficulty: input.difficulty || "Intermediate",
-      key: input.key || "C",
-      capo: input.capo ?? 0,
+      song_key: input.key || "C",
+      capo: typeof input.capo === "number" ? input.capo : 0,
       tuning: input.tuning || "Standard",
-      popularity: 88,
-      artColor: "from-amber-800 to-orange-950",
-      chordCount: chords.length,
+      lyrics: input.lyricsText.trim(),
+      chord_count: chords.length,
+      popularity: 80,
+      album: null,
+      art_color: "from-amber-800 to-orange-950",
+      added_at: new Date().toISOString().split("T")[0],
+      duration: null,
+      cover_image: null,
       chords,
       sections,
     };
 
-    songStorage.saveStoredSong(newSong);
-    this.cachedSongs = null; // Invalidate catalog cache
-    return finalId;
+    // 6. Explicit Supabase insert and error check
+    const { data, error } = await supabase
+      .from("songs")
+      .insert(songData)
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Song upload failed:", {
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+      });
+      throw error;
+    }
+
+    if (!data) {
+      throw new Error("Song upload failed: No data returned from Supabase.");
+    }
+
+    // 7. Convert database row into application SongDetail format
+    const createdSong = mapDatabaseRowToSongDetail(data as DatabaseSongRow);
+
+    // 8. Cache slug <-> UUID mapping for instant route & favorite lookups
+    if (data.id && data.slug) {
+      this.slugToUuidMap.set(data.slug, data.id);
+      this.uuidToSlugMap.set(data.id, data.slug);
+    }
+
+    // 9. Invalidate catalog cache so newly uploaded song immediately appears in catalog/search
+    this.cachedSongs = null;
+
+    return createdSong;
+  }
+
+  /**
+   * Fetches songs uploaded by a specific user from public.songs.
+   * Maps database rows to frontend Song array for My Music view.
+   */
+  async getUserUploadedSongs(userId?: string): Promise<Song[]> {
+    try {
+      const effectiveUserId = userId || (await this.getEffectiveUser())?.id;
+      if (!effectiveUserId) return [];
+
+      const { data, error } = await supabase
+        .from("songs")
+        .select("*")
+        .eq("uploaded_by", effectiveUserId)
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        console.error("Failed to fetch user uploads from Supabase:", error);
+        return [];
+      }
+
+      if (!data || data.length === 0) return [];
+
+      return data.map((row) => ({
+        id: row.slug || row.id,
+        title: row.title ?? "",
+        artist: row.artist ?? "",
+        genre: (row.genre as Genre) || "Pop",
+        key: row.song_key ?? "C",
+        capo: typeof row.capo === "number" ? row.capo : 0,
+        difficulty: (row.difficulty as Difficulty) || "Intermediate",
+        chordCount: typeof row.chord_count === "number" ? row.chord_count : 0,
+        popularity: typeof row.popularity === "number" ? row.popularity : 0,
+        addedAt:
+          row.added_at ||
+          (row.created_at
+            ? row.created_at.split("T")[0] || ""
+            : new Date().toISOString().split("T")[0] || ""),
+        isFavorited: false,
+        ...(row.album ? { album: row.album } : {}),
+        artColor: row.art_color || "from-amber-800 to-orange-950",
+      }));
+    } catch (err) {
+      console.error("Unexpected error fetching user uploads:", err);
+      return [];
+    }
   }
 
   // ─── Favorites Implementation ──────────────────────────────────────────

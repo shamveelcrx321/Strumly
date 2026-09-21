@@ -9,6 +9,8 @@ import { SongCard } from "@/components/SongCard";
 import studioImage from "@/assets/strumly-studio.jpg";
 import { useAuth } from "@/lib/auth-context";
 import { useFavorites } from "@/lib/favorites-context";
+import { songService } from "@/services/song-service";
+import type { Song } from "@/services/song-types";
 
 const myMusicSearchSchema = z.object({
   tab: z.enum(["favorites", "uploads"]).optional().default("favorites"),
@@ -61,12 +63,49 @@ function MyMusicPage() {
   const { isAuthenticated, user, isLoading: isAuthLoading } = useAuth();
   const { favoriteSongs, isLoading: isFavoritesLoading } = useFavorites();
 
+  const [uploadedSongs, setUploadedSongs] = React.useState<Song[]>([]);
+  const [isUploadsLoading, setIsUploadsLoading] = React.useState(false);
+  const [uploadsError, setUploadsError] = React.useState<string | null>(null);
+
   React.useEffect(() => {
     if (tab) setActiveTab(tab);
   }, [tab]);
 
+  // Load user's uploaded songs when authenticated and on uploads tab
+  React.useEffect(() => {
+    if (!isAuthenticated || !user?.id) {
+      setUploadedSongs([]);
+      setIsUploadsLoading(false);
+      return;
+    }
+
+    let isMounted = true;
+    setIsUploadsLoading(true);
+    setUploadsError(null);
+
+    songService
+      .getUserUploadedSongs(user.id)
+      .then((songs) => {
+        if (!isMounted) return;
+        setUploadedSongs(songs);
+        setIsUploadsLoading(false);
+      })
+      .catch((err) => {
+        if (!isMounted) return;
+        console.error("Error loading user uploads:", err);
+        setUploadsError(
+          err instanceof Error ? err.message : "Failed to load uploads",
+        );
+        setIsUploadsLoading(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isAuthenticated, user?.id]);
+
   const userName =
-    (user?.user_metadata?.full_name as string) ||
+    (user?.user_metadata?.["full_name"] as string) ||
     (user?.email ? user.email.split("@")[0] : undefined) ||
     "Musician";
 
@@ -132,6 +171,11 @@ function MyMusicPage() {
           >
             <Upload size={16} className={activeTab === "uploads" ? "text-peach" : ""} />
             My Uploads
+            {isAuthenticated && uploadedSongs.length > 0 && (
+              <span className="ml-1 rounded-full bg-peach/20 px-2 py-0.5 text-xs font-bold text-peach">
+                {uploadedSongs.length}
+              </span>
+            )}
           </button>
         </div>
 
@@ -183,25 +227,87 @@ function MyMusicPage() {
                 </div>
               </div>
             )
-          ) : (
-            <div className="mt-10 max-w-lg rounded-2xl border border-glass-border/60 bg-[#171210]/80 p-8 shadow-xl backdrop-blur-xl animate-flow-4 text-center mx-auto">
-              <div className="inline-grid size-12 place-items-center rounded-2xl bg-peach/15 text-peach mb-4">
-                <Sparkles size={24} />
-              </div>
+          ) : isUploadsLoading || isAuthLoading ? (
+            <div className="mt-8 grid gap-3 sm:grid-cols-2 xl:grid-cols-3 animate-flow-4">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <SkeletonCard key={i} />
+              ))}
+            </div>
+          ) : uploadsError ? (
+            <div className="mt-10 max-w-lg rounded-2xl border border-rose-500/40 bg-[#171210]/80 p-8 shadow-xl backdrop-blur-xl animate-flow-4 text-center mx-auto">
               <h2 className="font-display text-2xl font-bold text-cream">
-                Your Uploads
+                Unable to load uploads
               </h2>
               <p className="mt-2 text-sm text-cream/75 leading-relaxed">
-                Logged in as <span className="font-semibold text-peach">{userName}</span> ({user?.email}).
-                Manage and share your custom arrangements and song lyrics.
+                {uploadsError}
+              </p>
+              <div className="mt-6 flex justify-center">
+                <Button
+                  onClick={() => {
+                    if (user?.id) {
+                      setIsUploadsLoading(true);
+                      setUploadsError(null);
+                      songService
+                        .getUserUploadedSongs(user.id)
+                        .then((s) => {
+                          setUploadedSongs(s);
+                          setIsUploadsLoading(false);
+                        })
+                        .catch((e) => {
+                          setUploadsError(
+                            e instanceof Error ? e.message : "Failed to load uploads",
+                          );
+                          setIsUploadsLoading(false);
+                        });
+                    }
+                  }}
+                  variant="warm"
+                  size="hero"
+                  className="rounded-xl px-6 cursor-pointer"
+                >
+                  Try Again
+                </Button>
+              </div>
+            </div>
+          ) : uploadedSongs.length === 0 ? (
+            <div className="mt-10 max-w-lg rounded-2xl border border-glass-border/60 bg-[#171210]/80 p-8 shadow-xl backdrop-blur-xl animate-flow-4 text-center mx-auto">
+              <div className="inline-grid size-12 place-items-center rounded-2xl bg-peach/15 text-peach mb-4">
+                <Upload size={24} className="text-peach" />
+              </div>
+              <h2 className="font-display text-2xl font-bold text-cream">
+                No uploads yet
+              </h2>
+              <p className="mt-2 text-sm text-cream/75 leading-relaxed">
+                You haven't uploaded any songs or custom arrangements yet. Share your music with the Strumly community!
               </p>
               <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
                 <Button asChild variant="warm" size="hero" className="rounded-xl px-6">
-                  <Link to="/upload">Upload a New Song</Link>
+                  <Link to="/upload">Upload a Song</Link>
                 </Button>
                 <Button asChild variant="glass" size="hero" className="rounded-xl px-6">
                   <Link to="/search">Explore Song Catalog</Link>
                 </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="mt-6 space-y-4 animate-flow-4">
+              <div className="flex items-center justify-between text-xs text-warm-muted">
+                <span>
+                  {uploadedSongs.length}{" "}
+                  {uploadedSongs.length === 1 ? "song" : "songs"} uploaded by you
+                </span>
+                <Link to="/upload" className="text-peach hover:underline flex items-center gap-1">
+                  Upload another song →
+                </Link>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                {uploadedSongs.map((song) => (
+                  <SongCard
+                    key={song.id}
+                    song={song}
+                    redirectPath="/my-music?tab=uploads"
+                  />
+                ))}
               </div>
             </div>
           )

@@ -239,7 +239,7 @@ function UploadPage() {
     setIsSubmitting(true);
 
     try {
-      const newSongId = await songService.createSong({
+      const createdSong = await songService.createSong({
         title: title.trim(),
         artist: artist.trim(),
         author: author.trim(),
@@ -254,10 +254,15 @@ function UploadPage() {
       toast.success("Your song has been added to Strumly.");
 
       // Navigate to the newly created song detail page
-      void navigate({ to: "/song/$id", params: { id: newSongId } });
+      const targetId = typeof createdSong === "string" ? createdSong : createdSong.id;
+      void navigate({ to: "/song/$id", params: { id: targetId } });
     } catch (err) {
-      console.error(err);
-      toast.error("Failed to create song. Please try again.");
+      console.error("Upload error:", err);
+      const message =
+        err instanceof Error
+          ? err.message
+          : "Failed to create song. Please try again.";
+      toast.error(message);
       setIsSubmitting(false);
     }
   };

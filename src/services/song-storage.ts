@@ -3,9 +3,26 @@ import type { SongDetail } from "./song-types";
 const STORAGE_KEY = "strumly_uploaded_songs";
 
 /**
- * Storage abstraction for user-uploaded songs.
- * Safely accesses localStorage in browser environments, returning an empty list during SSR.
+ * Storage abstraction for legacy user-uploaded songs.
+ * Supabase public.songs is now the authoritative source of truth.
+ * Safely cleans up old localStorage entries on browser initialization.
  */
+export function clearLegacyUploadedSongsCache(): void {
+  if (typeof window === "undefined" || !window.localStorage) return;
+  try {
+    if (window.localStorage.getItem(STORAGE_KEY)) {
+      window.localStorage.removeItem(STORAGE_KEY);
+    }
+  } catch (e) {
+    console.warn("Failed to clear legacy uploaded songs from localStorage", e);
+  }
+}
+
+// Auto-run cleanup in browser environments to purge stale legacy items (e.g. old Amazing Grace cards)
+if (typeof window !== "undefined") {
+  clearLegacyUploadedSongsCache();
+}
+
 export const songStorage = {
   getStoredSongs(): SongDetail[] {
     if (typeof window === "undefined" || !window.localStorage) {
@@ -44,5 +61,9 @@ export const songStorage = {
     } catch (e) {
       console.error("Failed to remove song from localStorage", e);
     }
+  },
+
+  clearLegacyCache(): void {
+    clearLegacyUploadedSongsCache();
   },
 };

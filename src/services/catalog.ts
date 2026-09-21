@@ -465,7 +465,6 @@ export const mockSongs: Song[] = [
   },
 ];
 
-import { songStorage } from "./song-storage";
 import { getSongsFromSupabase } from "./song-service";
 
 // ─── Search Function ──────────────────────────────────────────────────────────
@@ -479,7 +478,7 @@ export async function searchSongs(
 
   const dbSongs = await getSongsFromSupabase();
 
-  const supabaseSongs: Song[] = (dbSongs || []).map((row: any) => ({
+  const allSongs: Song[] = (dbSongs || []).map((row: any) => ({
     id: row.slug || "",
     title: row.title || "",
     artist: row.artist || "",
@@ -494,23 +493,6 @@ export async function searchSongs(
     album: row.album ?? undefined,
     artColor: row.art_color || "from-amber-800 to-orange-950",
   }));
-
-  const storedSongs: Song[] = songStorage.getStoredSongs().map((s) => ({
-    id: s.id,
-    title: s.title,
-    artist: s.artist,
-    genre: (s.genre as Genre) || "Pop",
-    key: s.key,
-    capo: s.capo,
-    difficulty: s.difficulty,
-    chordCount: s.chords.length,
-    popularity: s.popularity ?? 90,
-    addedAt: new Date().toISOString(),
-    isFavorited: false,
-    artColor: s.artColor || "from-amber-800 to-orange-950",
-  }));
-
-  const allSongs = [...storedSongs, ...supabaseSongs];
 
   let results = allSongs.filter((song) => {
     // Text search
